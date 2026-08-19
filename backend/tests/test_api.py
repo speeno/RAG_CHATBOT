@@ -63,7 +63,7 @@ def test_feedback_and_logs(seeded):
     body = seeded.post("/api/chat", json={"message": "배송 조회는 어떻게 하나요?"}).json()
     r = seeded.post("/api/feedback", json={"message_id": body["message_id"], "rating": "negative", "reason": "설명이 부족해요"})
     assert r.status_code == 200
-    logs = seeded.get("/api/logs").json()
+    logs = seeded.get("/api/logs").json()["items"]
     assert logs[0]["message_id"] == body["message_id"] and logs[0]["feedback"] == "negative"
     assert logs[0]["retrieved"] and "retrieval_ms" in logs[0]
     assert seeded.post("/api/feedback", json={"message_id": "nope", "rating": "positive"}).status_code == 404
@@ -109,3 +109,34 @@ def test_search_test_reports_threshold_rewrite_and_hit(seeded):
     # 근거 없는 질문 → Fail-Closed 판정, 정답 문서 미지정 → hit None
     r3 = seeded.post("/api/search/test", json={"query": "양자역학 슈뢰딩거 방정식 유도"})
     assert r3.json()["passes_threshold"] is False and r3.json()["hit"] is None
+
+
+def test_logs_filters_paging_export_and_detail(seeded):
+    a = seeded.post("/api/chat", json={"message": "환불은 며칠 이내에 신청해야 하나요?"}).json()
+    b = seeded.post("/api/chat", json={"message": "양자역학 슈뢰딩거 방정식 유도"}).json()
+    seeded.post("/api/feedback", json={"message_id": a["message_id"], "rating": "positive"})
+
+    page = seeded.get("/api/logs", params={"limit": 1}).json()
+    assert page["total"] == 2 and page["limit"] == 1 and len(page["items"]) == 1
+    assert page["items"][0]["message_id"] == b["message_id"]  # 최신순
+    page2 = seeded.get("/api/logs", params={"limit": 1, "offset": 1}).json()
+    assert page2["items"][0]["message_id"] == a["message_id"]
+
+    # 응답 상태 / 피드백 / 검색어 / 기간 필터
+    assert seeded.get("/api/logs", params={"answerable": "false"}).json()["total"] == 1
+    assert seeded.get("/api/logs", params={"feedback": "positive"}).json()["total"] == 1
+    assert seeded.get("/api/logs", params={"feedback": "none"}).json()["total"] == 1
+    assert seeded.get("/api/logs", params={"q": "환불"}).json()["total"] == 1
+    today = page["items"][0]["created_at"][:10]
+    assert seeded.get("/api/logs", params={"date_from": today, "date_to": today}).json()["total"] == 2
+    assert seeded.get("/api/logs", params={"date_to": "2000-01-01"}).json()["total"] == 0
+    assert seeded.get("/api/logs", params={"feedback": "bogus"}).status_code == 422
+
+    # 상세 + CSV
+    d = seeded.get(f"/api/logs/{a['message_id']}").json()
+    assert d["answerable"] is True and d["feedback"] == "positive" and isinstance(d["retrieved"], list) and d["retrieved"]
+    assert seeded.get("/api/logs/nope").status_code == 404
+    csv_res = seeded.get("/api/logs/export.csv", params={"answerable": "true"})
+    assert csv_res.status_code == 200 and "text/csv" in csv_res.headers["content-type"]
+    lines = csv_res.text.lstrip("﻿").splitlines()
+    assert lines[0].startswith("created_at,conversation_id,message_id,user_query") and len(lines) == 2

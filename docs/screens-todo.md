@@ -14,12 +14,12 @@
 | A2 | 지식베이스 목록/문서 정보 | `admin/02-knowledge-base-list` | §30~31 | 1 | `/admin/knowledge` | `/api/knowledge*` | ✅ 완료 |
 | A3 | 문서 업로드·색인 진행 | `admin/03-document-upload-indexing` | §30 | 1 | `/admin/knowledge` | `/api/knowledge` POST·폴링 | ✅ 완료 |
 | A4 | 검색 테스트 | `admin/04-search-test` | §32 | 2 | `/admin/search-test` SearchTestView | `POST /api/search/test`(정규화·Rewrite·임계값·Hit) | ✅ 완료(2026-08-20) — BM25/Reranker 열은 Phase 2 후 채움 |
-| A5 | **상담 로그** | `admin/05-conversation-logs` | §33 | 3 | ❌ 없음 | ⚠️ `GET /api/logs?limit=` 있음(필터/페이징 없음) | 🔴 미구현 |
+| A5 | 상담 로그 | `admin/05-conversation-logs` | §33 | 3 | `/admin/logs` LogsView | `GET /api/logs`(필터·페이징), `/api/logs/{message_id}`, `/api/logs/export.csv` | ✅ 완료(2026-08-20) |
 | A6 | **미답변 분석** | `admin/06-unanswered-analysis` | §35 | 3 | ❌ 없음 | ❌ 집계 API 없음 | 🔴 미구현 |
 | — | 플로팅 챗봇 위젯 | (목업 없음) | §41 | 선택 | ❌ | — | ⚪ 미구현(선택) |
 | — | 문서 버전 관리 / 권한 관리(RBAC) | (목업 없음) | §29, Phase 3 | 3 | ❌ | ❌ | ⚪ 미구현(화면 설계 필요) |
 
-사이드바(`components/Sidebar.tsx`)에는 현재 `상담하기`, `지식베이스`, `검색 테스트` 메뉴가 있다. A1·A5·A6 구현 시 메뉴 추가 필요.
+사이드바(`components/Sidebar.tsx`)에는 현재 `상담하기`, `지식베이스`, `검색 테스트`, `상담 로그` 메뉴가 있다. A1·A6 구현 시 메뉴 추가 필요.
 
 ---
 
@@ -37,8 +37,8 @@
 
 백엔드 보강: `POST /api/search/test`에 `rewritten_query`, `threshold` 대비 pass 여부, (Phase 2) `bm25_score`/`rerank_score` 필드 추가.
 
-### A5. 상담 로그 — `/admin/logs` (Phase 3, 우선순위 2)
-목업 `admin/05-conversation-logs.png` · PRD §33. 이미 `turn_logs` 테이블에 모든 턴이 저장되고 있어 **데이터는 있음**.
+### A5. 상담 로그 — `/admin/logs` ✅ 구현 완료 (2026-08-20)
+목업 `admin/05-conversation-logs.png` · PRD §33. 구현: `frontend/components/admin/LogsView.tsx`, API `GET /api/logs?limit&offset&date_from&date_to&answerable&feedback&q` → `{items,total,limit,offset}`, `GET /api/logs/{message_id}`, `GET /api/logs/export.csv`(UTF-8 BOM, 최대 5,000건). 목업의 카테고리/채널/담당부서 필터는 데이터가 없어 생략.
 
 화면 요소:
 - 필터: 기간, 피드백 상태(긍정/부정/없음), 응답 상태(성공/미답변), 질문 검색어 (목업의 카테고리·채널·담당부서는 데이터 없음 → 생략 또는 문서 카테고리로 대체)
@@ -83,7 +83,7 @@
 
 ## 제안 구현 순서
 1. ~~A4 검색 테스트~~ ✅ 완료
-2. **A5 상담 로그** — 데이터 존재, 필터/페이징 API 보강 포함 2일.
+2. ~~A5 상담 로그~~ ✅ 완료
 3. **A1 대시보드** — 집계 API 신설, 차트 컴포넌트(외부 라이브러리 없이 SVG) 2~3일.
 4. **A6 미답변 분석** — 대시보드 집계 재사용 + 처리 상태 테이블 2일.
 5. **U3 핸드오프 버튼** — 반나절.

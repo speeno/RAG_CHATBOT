@@ -66,9 +66,68 @@ def feedback(req: S.FeedbackRequest, svc: Services = Depends(get_services)) -> d
     return {"ok": True}
 
 
-@router.get("/logs")
-def logs(limit: int = 100, svc: Services = Depends(get_services)) -> list[dict[str, Any]]:
-    return svc.db.list_turn_logs(limit=min(limit, 500))
+def _log_filters(date_from: str | None, date_to: str | None, answerable: bool | None, feedback: str | None, q: str | None) -> dict[str, Any]:
+    """date_from/date_to 는 'YYYY-MM-DD' 또는 ISO8601. date_to 는 포함(inclusive)이라 다음 날 0시로 바꿔 비교한다."""
+    def _norm(d: str | None, end: bool) -> str | None:
+        if not d:
+            return None
+        d = d.strip()
+        if len(d) == 10:  # YYYY-MM-DD
+            if end:
+                from datetime import date, timedelta
+                return (date.fromisoformat(d) + timedelta(days=1)).isoformat()
+            return d
+        return d
+    if feedback not in (None, "", "positive", "negative", "none"):
+        raise HTTPException(422, "feedback must be positive|negative|none")
+    return {"date_from": _norm(date_from, False), "date_to": _norm(date_to, True),
+            "answerable": answerable, "feedback": feedback or None, "q": (q or "").strip() or None}
+
+
+@router.get("/logs", response_model=S.LogsPage)
+def logs(limit: int = 20, offset: int = 0, date_from: str | None = None, date_to: str | None = None,
+         answerable: bool | None = None, feedback: str | None = None, q: str | None = None,
+         svc: Services = Depends(get_services)) -> dict[str, Any]:
+    """상담 로그 목록(PRD §33) — 기간/응답 상태/피드백/검색어 필터 + 페이징."""
+    f = _log_filters(date_from, date_to, answerable, feedback, q)
+    limit = max(1, min(limit, 100))
+    offset = max(0, offset)
+    return {"items": svc.db.list_turn_logs(limit=limit, offset=offset, **f), "total": svc.db.count_turn_logs(**f),
+            "limit": limit, "offset": offset}
+
+
+@router.get("/logs/export.csv")
+def logs_export(date_from: str | None = None, date_to: str | None = None, answerable: bool | None = None,
+                feedback: str | None = None, q: str | None = None, svc: Services = Depends(get_services)) -> StreamingResponse:
+    """현재 필터의 로그를 CSV로 내보낸다(최대 5,000건, UTF-8 BOM → Excel 호환)."""
+    import csv
+    import io
+
+    f = _log_filters(date_from, date_to, answerable, feedback, q)
+    rows = svc.db.list_turn_logs(limit=5000, offset=0, **f)
+    buf = io.StringIO()
+    buf.write("\ufeff")
+    w = csv.writer(buf)
+    w.writerow(["created_at", "conversation_id", "message_id", "user_query", "rewritten_query", "answerable", "answer",
+                "feedback", "feedback_reason", "retrieval_ms", "llm_ms", "total_ms", "llm_provider", "embedding_provider",
+                "retrieved_titles", "top_score"])
+    for r in rows:
+        ret = r.get("retrieved") or []
+        w.writerow([r["created_at"], r["conversation_id"], r["message_id"], r["user_query"], r.get("rewritten_query") or "",
+                    "" if r.get("answerable") is None else int(bool(r["answerable"])), (r.get("answer") or "").replace("\n", " "),
+                    r.get("feedback") or "", r.get("feedback_reason") or "", r.get("retrieval_ms"), r.get("llm_ms"), r.get("total_ms"),
+                    r.get("llm_provider") or "", r.get("embedding_provider") or "",
+                    " | ".join(f"{x.get('title')}({x.get('score')})" for x in ret), ret[0].get("score") if ret else ""])
+    return StreamingResponse(iter([buf.getvalue()]), media_type="text/csv; charset=utf-8",
+                             headers={"Content-Disposition": "attachment; filename=conversation-logs.csv"})
+
+
+@router.get("/logs/{message_id}", response_model=S.TurnLogOut)
+def log_detail(message_id: str, svc: Services = Depends(get_services)) -> dict[str, Any]:
+    row = svc.db.get_turn_log(message_id)
+    if not row:
+        raise HTTPException(404, "log not found")
+    return row
 
 
 # ── knowledge ───────────────────────────────────────────────────

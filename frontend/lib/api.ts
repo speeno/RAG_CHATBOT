@@ -50,6 +50,48 @@ export type SearchTestResponse = {
   results: SearchTestResult[];
 };
 
+export type TurnLog = {
+  id: string;
+  conversation_id: string;
+  message_id: string;
+  user_query: string;
+  rewritten_query: string | null;
+  retrieved: Source[];
+  answer: string | null;
+  answerable: boolean | null;
+  llm_provider: string | null;
+  embedding_provider: string | null;
+  retrieval_ms: number | null;
+  llm_ms: number | null;
+  total_ms: number | null;
+  feedback: "positive" | "negative" | null;
+  feedback_reason: string | null;
+  created_at: string;
+};
+
+export type LogsQuery = {
+  limit?: number;
+  offset?: number;
+  date_from?: string;
+  date_to?: string;
+  answerable?: boolean;
+  feedback?: "positive" | "negative" | "none";
+  q?: string;
+};
+
+export type LogsPage = { items: TurnLog[]; total: number; limit: number; offset: number };
+
+export type ConversationOut = { conversation_id: string; messages: { id: string; role: string; content: string; sources: Source[]; answerable: boolean | null; created_at: string }[] };
+
+export function logsQueryString(q: LogsQuery): string {
+  const p = new URLSearchParams();
+  Object.entries(q).forEach(([k, v]) => {
+    if (v === undefined || v === null || v === "") return;
+    p.set(k, String(v));
+  });
+  return p.toString();
+}
+
 export type Health = {
   status: string;
   db_backend: string;
@@ -123,6 +165,11 @@ async function fetchWithRetry(input: string, init: RequestInit | undefined, retr
 
 export const api = {
   health: () => fetchWithRetry(`${API_URL}/api/health`, { cache: "no-store" }, 2, 800).then(j<Health>),
+
+  listLogs: (q: LogsQuery) => fetch(`${API_URL}/api/logs?${logsQueryString(q)}`, { cache: "no-store" }).then(j<LogsPage>),
+  getLog: (messageId: string) => fetch(`${API_URL}/api/logs/${messageId}`, { cache: "no-store" }).then(j<TurnLog>),
+  logsExportUrl: (q: LogsQuery) => `${API_URL}/api/logs/export.csv?${logsQueryString(q)}`,
+  getConversation: (id: string) => fetch(`${API_URL}/api/conversations/${id}`, { cache: "no-store" }).then(j<ConversationOut>),
 
   searchTest: (body: { query: string; top_k?: number; previous_query?: string | null; expected_document_id?: string | null }) =>
     fetch(`${API_URL}/api/search/test`, {

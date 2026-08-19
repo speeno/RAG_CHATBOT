@@ -125,6 +125,32 @@ class SearchTestResponse(BaseModel):
     results: list[dict[str, Any]]
 
 
+class TurnLogOut(BaseModel):
+    id: str
+    conversation_id: str
+    message_id: str
+    user_query: str
+    rewritten_query: str | None = None
+    retrieved: list[dict[str, Any]] = []
+    answer: str | None = None
+    answerable: bool | None = None
+    llm_provider: str | None = None
+    embedding_provider: str | None = None
+    retrieval_ms: int | None = None
+    llm_ms: int | None = None
+    total_ms: int | None = None
+    feedback: str | None = None
+    feedback_reason: str | None = None
+    created_at: str
+
+
+class LogsPage(BaseModel):
+    items: list[TurnLogOut]
+    total: int
+    limit: int
+    offset: int
+
+
 class HealthOut(BaseModel):
     status: str
     db_backend: str = "sqlite"

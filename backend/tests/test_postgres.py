@@ -97,7 +97,7 @@ def test_feedback_and_logs(pg_seeded):
     body = pg_seeded.post("/api/chat", json={"message": "환불 절차 알려줘"}).json()
     r = pg_seeded.post("/api/feedback", json={"message_id": body["message_id"], "rating": "negative", "reason": "incorrect"})
     assert r.status_code == 200
-    logs = pg_seeded.get("/api/logs").json()
+    logs = pg_seeded.get("/api/logs").json()["items"]
     mine = [l for l in logs if l["message_id"] == body["message_id"]]
     assert mine and mine[0]["feedback"] == "negative"
     assert isinstance(mine[0]["retrieved"], list)

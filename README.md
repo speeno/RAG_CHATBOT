@@ -106,7 +106,8 @@ HTML 목업 보기: `docs/design/html/index.html`을 브라우저로 열거나, 
 | POST | `/api/chat/stream` | SSE 스트리밍 (`meta → sources → delta* → done`) |
 | GET | `/api/conversations/{id}` | 대화 이력 |
 | POST | `/api/feedback` | 👍/👎 + 사유 |
-| GET | `/api/logs` | 상담 로그(질문/재작성 쿼리/검색 결과/점수/답변/응답시간/피드백) |
+| GET | `/api/logs` | 상담 로그 목록 — `limit/offset/date_from/date_to/answerable/feedback/q` 필터 → `{items,total}` (`/admin/logs` 화면) |
+| GET | `/api/logs/{message_id}`, `/api/logs/export.csv` | 로그 상세 / 현재 필터 CSV 내보내기 |
 | GET/POST | `/api/knowledge` | 문서 목록 / 등록(multipart `file` 또는 `content`, 폼 필드가 front matter보다 우선) |
 | GET/PATCH/DELETE | `/api/knowledge/{id}` | 상세(원문) / 상태·메타 수정 / 삭제 |
 | GET | `/api/knowledge/{id}/chunks` | 청크 목록 |

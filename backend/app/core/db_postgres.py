@@ -74,6 +74,7 @@ POSTGRES_SCHEMA = [
     "CREATE INDEX IF NOT EXISTS idx_messages_conversation ON messages(conversation_id)",
     """
     CREATE TABLE IF NOT EXISTS turn_logs (
+      seq BIGSERIAL,
       id TEXT PRIMARY KEY,
       conversation_id TEXT NOT NULL,
       message_id TEXT NOT NULL,
@@ -93,6 +94,10 @@ POSTGRES_SCHEMA = [
     )
     """,
     "CREATE INDEX IF NOT EXISTS idx_turn_logs_message ON turn_logs(message_id)",
+    # 기존 테이블(초기 배포분)에 정렬 보조 컬럼이 없으면 추가 — 멱등
+    "ALTER TABLE turn_logs ADD COLUMN IF NOT EXISTS seq BIGSERIAL",
+    "ALTER TABLE messages ADD COLUMN IF NOT EXISTS seq BIGSERIAL",
+    "CREATE INDEX IF NOT EXISTS idx_turn_logs_created ON turn_logs(created_at)",
 ]
 
 TABLES = ("turn_logs", "messages", "conversations", "chunks", "documents")

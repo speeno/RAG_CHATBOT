@@ -8,6 +8,7 @@ const TITLES: Record<string, string> = {
   "/": "상담하기",
   "/admin/knowledge": "지식베이스 관리",
   "/admin/search-test": "검색 테스트",
+  "/admin/logs": "상담 로그",
 };
 
 export function Topbar() {

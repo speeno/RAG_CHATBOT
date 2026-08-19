@@ -107,7 +107,7 @@ def new_id() -> str:
 class BaseDatabase(ABC):
     """DB 구현체 공통 로직. 서브클래스는 `connect()`·`_exec()`·`_executemany()`·`_MESSAGE_ORDER`·`ping()`만 제공한다."""
 
-    #: messages 정렬 보조 컬럼 (같은 초에 저장된 user/assistant 순서 보장)
+    #: messages/turn_logs 정렬 보조 컬럼 (같은 초에 저장된 행의 순서 보장) — SQLite: rowid, Postgres: seq
     _MESSAGE_ORDER = "rowid"
     name = "base"
 
@@ -278,15 +278,59 @@ class BaseDatabase(ABC):
             )
         return cur.rowcount > 0
 
-    def list_turn_logs(self, limit: int = 100) -> list[dict[str, Any]]:
+    @staticmethod
+    def _turn_log_filters(*, date_from: str | None = None, date_to: str | None = None,
+                          answerable: bool | None = None, feedback: str | None = None,
+                          q: str | None = None) -> tuple[str, list[Any]]:
+        """상담 로그 필터 → (WHERE 절, 파라미터). created_at 은 ISO8601 문자열이라 문자열 비교로 충분하다."""
+        where: list[str] = []
+        params: list[Any] = []
+        if date_from:
+            where.append("created_at >= ?"); params.append(date_from)
+        if date_to:
+            where.append("created_at < ?"); params.append(date_to)
+        if answerable is not None:
+            where.append("answerable = ?"); params.append(int(answerable))
+        if feedback == "none":
+            where.append("feedback IS NULL")
+        elif feedback in ("positive", "negative"):
+            where.append("feedback = ?"); params.append(feedback)
+        if q:
+            where.append("(LOWER(user_query) LIKE LOWER(?) OR LOWER(COALESCE(answer,'')) LIKE LOWER(?))")
+            params += [f"%{q}%", f"%{q}%"]
+        return (" WHERE " + " AND ".join(where)) if where else "", params
+
+    def list_turn_logs(self, limit: int = 100, offset: int = 0, **filters: Any) -> list[dict[str, Any]]:
+        where, params = self._turn_log_filters(**filters)
         with self.connect() as conn:
-            rows = self._exec(conn, "SELECT * FROM turn_logs ORDER BY created_at DESC LIMIT ?", (limit,)).fetchall()
+            rows = self._exec(
+                conn, f"SELECT * FROM turn_logs{where} ORDER BY created_at DESC, {self._MESSAGE_ORDER} DESC LIMIT ? OFFSET ?", [*params, limit, offset]
+            ).fetchall()
         out = []
         for r in rows:
             d = dict(r)
+            d.pop("seq", None)
             d["retrieved"] = json.loads(d["retrieved"] or "[]")
+            d["answerable"] = None if d["answerable"] is None else bool(d["answerable"])
             out.append(d)
         return out
+
+    def count_turn_logs(self, **filters: Any) -> int:
+        where, params = self._turn_log_filters(**filters)
+        with self.connect() as conn:
+            row = self._exec(conn, f"SELECT COUNT(*) AS n FROM turn_logs{where}", params).fetchone()
+        return int(row["n"] if row else 0)
+
+    def get_turn_log(self, message_id: str) -> dict[str, Any] | None:
+        with self.connect() as conn:
+            row = self._exec(conn, "SELECT * FROM turn_logs WHERE message_id=?", (message_id,)).fetchone()
+        if not row:
+            return None
+        d = dict(row)
+        d.pop("seq", None)
+        d["retrieved"] = json.loads(d["retrieved"] or "[]")
+        d["answerable"] = None if d["answerable"] is None else bool(d["answerable"])
+        return d
 
 
 class SqliteDatabase(BaseDatabase):
