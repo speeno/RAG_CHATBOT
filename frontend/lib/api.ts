@@ -80,8 +80,25 @@ async function j<T>(res: Response): Promise<T> {
   return res.status === 204 ? (undefined as T) : ((await res.json()) as T);
 }
 
+/** 무료 호스팅(Render)은 라우팅 전파/콜드스타트 중 일시적으로 404/502/503을 돌려줄 수 있어 짧게 재시도한다. */
+async function fetchWithRetry(input: string, init: RequestInit | undefined, retries: number, delayMs: number): Promise<Response> {
+  let last: unknown;
+  for (let i = 0; i <= retries; i++) {
+    try {
+      const res = await fetch(input, init);
+      if (res.ok || ![404, 502, 503, 504].includes(res.status) || i === retries) return res;
+      last = new Error(`${res.status}`);
+    } catch (e) {
+      last = e;
+      if (i === retries) throw e;
+    }
+    await new Promise((r) => setTimeout(r, delayMs * (i + 1)));
+  }
+  throw last instanceof Error ? last : new Error(String(last));
+}
+
 export const api = {
-  health: () => fetch(`${API_URL}/api/health`, { cache: "no-store" }).then(j<Health>),
+  health: () => fetchWithRetry(`${API_URL}/api/health`, { cache: "no-store" }, 2, 800).then(j<Health>),
 
   chat: (message: string, conversation_id?: string | null) =>
     fetch(`${API_URL}/api/chat`, {
