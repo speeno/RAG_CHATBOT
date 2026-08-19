@@ -102,9 +102,11 @@ Render 환경변수 `CORS_ORIGINS=https://<project>.vercel.app` (커스텀 도�
 - [ ] `/admin/knowledge` 업로드 → 상태 폴링 `uploaded→…→indexed`, 비활성화 시 검색 제외.
 - [ ] Supabase Table Editor에서 `documents/chunks/turn_logs` 행 확인.
 
-## 7. (선택) keep-alive
+## 7. keep-alive (적용됨: `.github/workflows/keepalive.yml`)
 
-Render 스핀다운과 Supabase 7일 정지를 함께 막으려면 외부 크론으로 `GET https://<svc>.onrender.com/api/health`를 **10분 간격** 호출한다(예: cron-job.org, UptimeRobot, GitHub Actions `schedule`). health는 DB를 실제로 조회하므로 Supabase 활동으로 집계된다. 단일 서비스 상시 가동은 월 ≈744h로 750h 한도 내.
+GitHub Actions가 **10분 간격**으로 `GET https://rag-chatbot-api-6aqk.onrender.com/api/health`를 호출해 Render 스핀다운과 Supabase 7일 정지를 함께 막는다(health가 DB를 실제 조회하므로 Supabase 활동으로 집계). 200 + `"db_ok":true`가 아니면 실패로 표시돼 GitHub 알림이 간다. 수동 실행: `gh workflow run keepalive.yml`, 확인: `gh run list --workflow keepalive.yml`.
+- URL 변경은 Repository Variable `KEEPALIVE_URL`로. 리포에 60일간 커밋이 없으면 GitHub가 스케줄을 비활성화하니 Actions 탭에서 다시 Enable.
+- Render free 750h/월은 워크스페이스 공유 → 상시 가동은 이 서비스 1개만(다른 free 웹서비스는 suspended 상태 유지). 필요 없으면 워크플로 파일을 삭제하면 원래대로 잠든다.
 
 ## 8. 운영 시 알아둘 것
 
