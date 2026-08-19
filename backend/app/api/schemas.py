@@ -109,6 +109,8 @@ class SearchTestResponse(BaseModel):
 
 class HealthOut(BaseModel):
     status: str
+    db_backend: str = "sqlite"
+    db_ok: bool = True
     llm_provider: str
     embedding_provider: str
     score_threshold: float

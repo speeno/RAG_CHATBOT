@@ -28,6 +28,8 @@ export type ChatResponse = {
 
 export type Health = {
   status: string;
+  db_backend: string;
+  db_ok: boolean;
   llm_provider: string;
   embedding_provider: string;
   score_threshold: number;

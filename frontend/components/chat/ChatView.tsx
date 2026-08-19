@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { api, chatStream, type ChatResponse, type Source } from "@/lib/api";
+import { API_URL, api, chatStream, type ChatResponse, type Source } from "@/lib/api";
 import { Icon } from "@/components/Icon";
 import { BotMessage, UserMessage, type BotMsg } from "./Messages";
 
@@ -24,6 +24,8 @@ export function ChatView() {
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // 무료 티어(Render) 백엔드는 유휴 시 잠들어 첫 응답에 최대 1분가량 걸린다 → 마운트 시 미리 깨우고 안내한다.
+  const [waking, setWaking] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
   const listRef = useRef<HTMLDivElement>(null);
   const taRef = useRef<HTMLTextAreaElement>(null);
@@ -31,6 +33,28 @@ export function ChatView() {
   useEffect(() => {
     listRef.current?.scrollTo({ top: listRef.current.scrollHeight, behavior: "smooth" });
   }, [messages]);
+
+  useEffect(() => {
+    let alive = true;
+    const slow = setTimeout(() => alive && setWaking(true), 2500);
+    const ping = async () => {
+      for (let i = 0; i < 20 && alive; i++) {
+        try {
+          await api.health();
+          break;
+        } catch {
+          await new Promise((r) => setTimeout(r, 5000));
+        }
+      }
+      clearTimeout(slow);
+      if (alive) setWaking(false);
+    };
+    ping();
+    return () => {
+      alive = false;
+      clearTimeout(slow);
+    };
+  }, []);
 
   const updateBot = useCallback((id: string, patch: Partial<BotMsg> | ((m: BotMsg) => Partial<BotMsg>)) => {
     setMessages((prev) =>
@@ -65,7 +89,7 @@ export function ChatView() {
           onDelta: (t) => updateBot(botId, (m) => ({ text: m.text + t })),
           onDone: (r: ChatResponse) => updateBot(botId, { text: r.answer, sources: r.sources, done: r, streaming: false }),
           onError: (e) => {
-            setError(`응답을 받지 못했습니다: ${e.message}. 백엔드(${process.env.NEXT_PUBLIC_API_URL})가 실행 중인지 확인해 주세요.`);
+            setError(`응답을 받지 못했습니다: ${e.message}. 서버가 기동 중이면 잠시 후 다시 시도해 주세요. (백엔드: ${API_URL})`);
             updateBot(botId, { streaming: false });
           },
         },
@@ -144,6 +168,11 @@ export function ChatView() {
               ),
             )}
           </div>
+          {waking && !error && (
+            <div className="alert warn" style={{ marginTop: 12 }}>
+              <span className="spinner" /> 서버를 깨우는 중입니다. 무료 호스팅 특성상 첫 응답까지 최대 1분 정도 걸릴 수 있어요.
+            </div>
+          )}
           {error && (
             <div className="alert error" style={{ marginTop: 12 }}><Icon name="alert-circle" /> {error}</div>
           )}

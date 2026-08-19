@@ -1,0 +1,40 @@
+# Render Blueprint — backend(FastAPI)만 배포한다. (프론트는 Vercel, DB는 Supabase)
+# Render 대시보드 ▸ New ▸ Blueprint ▸ 이 리포 선택 → sync:false 항목은 대시보드에서 직접 입력.
+# 자세한 순서: docs/deploy.md
+services:
+  - type: web
+    name: rag-chatbot-api
+    runtime: python
+    plan: free
+    region: singapore            # Supabase 프로젝트 리전과 가깝게 (oregon | frankfurt | singapore 등)
+    rootDir: backend
+    buildCommand: pip install --upgrade pip && pip install .
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /api/health
+    autoDeployTrigger: commit
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.7
+      # ── 필수 ──
+      - key: DATABASE_URL          # Supabase ▸ Connect ▸ Session pooler URI (+ ?sslmode=require)
+        sync: false
+      - key: CORS_ORIGINS          # 예: https://<project>.vercel.app  (쉼표로 여러 개)
+        sync: false
+      - key: CORS_ORIGIN_REGEX     # 예: https://.*\.vercel\.app  (Vercel Preview 도메인 허용)
+        sync: false
+      # ── LLM / 임베딩 (하나 이상 필수. 없으면 extractive/hash 오프라인 데모 모드) ──
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: VOYAGE_API_KEY
+        sync: false
+      # ── 선택 ──
+      - key: LLM_PROVIDER
+        value: auto
+      - key: EMBEDDING_PROVIDER
+        value: auto
+      - key: ANTHROPIC_MODEL
+        value: claude-opus-5
+      - key: OPENAI_MODEL
+        value: gpt-4.1-mini

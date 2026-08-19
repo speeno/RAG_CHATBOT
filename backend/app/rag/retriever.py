@@ -1,4 +1,4 @@
-"""Vector Store 인터페이스 + SQLite/numpy 구현, Retriever.
+"""Vector Store 인터페이스 + DB(SQLite/Postgres)→numpy 인메모리 구현, Retriever.
 
 PRD §16~§18: MVP는 Dense(Vector) 검색만 수행하며 Hybrid(BM25)·Reranker는 Phase 2에서 이 인터페이스 뒤에 추가한다.
 PRD §29/§31: 권한·상태(active) 필터는 검색 단계(DB 조회)에서 적용한다.
@@ -13,7 +13,7 @@ from typing import Any
 
 import numpy as np
 
-from app.core.db import Database
+from app.core.db import BaseDatabase
 from app.providers.embeddings import EmbeddingProvider
 
 
@@ -54,10 +54,10 @@ class VectorStore(ABC):
         """색인 변경(문서 추가/삭제/상태 변경) 시 캐시 무효화."""
 
 
-class SqliteNumpyVectorStore(VectorStore):
+class NumpyVectorStore(VectorStore):
     """활성·색인 완료 청크의 임베딩을 메모리에 캐시하고 코사인 유사도로 검색한다(수천~수만 청크 규모 적합)."""
 
-    def __init__(self, db: Database):
+    def __init__(self, db: BaseDatabase):
         self.db = db
         self._lock = threading.Lock()
         self._matrix: np.ndarray | None = None
@@ -147,3 +147,7 @@ class Retriever:
         chunks = self.store.search(qv, top_k or self.top_k)
         elapsed = int((time.perf_counter() - t0) * 1000)
         return RetrievalResult(query=query, chunks=chunks, elapsed_ms=elapsed, top_score=chunks[0].score if chunks else 0.0)
+
+
+# 하위 호환 별칭
+SqliteNumpyVectorStore = NumpyVectorStore

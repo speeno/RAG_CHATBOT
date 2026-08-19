@@ -7,7 +7,7 @@ from typing import Any
 
 import numpy as np
 
-from app.core.db import Database, now_iso
+from app.core.db import BaseDatabase, now_iso
 from app.ingestion.chunker import chunk_document
 from app.ingestion.parser import build_metadata, parse
 from app.providers.embeddings import EmbeddingProvider
@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 
 
 class Indexer:
-    def __init__(self, db: Database, embedder: EmbeddingProvider, store: VectorStore, *,
+    def __init__(self, db: BaseDatabase, embedder: EmbeddingProvider, store: VectorStore, *,
                  chunk_max_chars: int = 1200, chunk_overlap_chars: int = 150):
         self.db = db
         self.embedder = embedder

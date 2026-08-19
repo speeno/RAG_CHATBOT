@@ -5,12 +5,12 @@ import logging
 from dataclasses import dataclass
 
 from app.core.config import NO_ANSWER_MESSAGE, Settings
-from app.core.db import Database
+from app.core.db import BaseDatabase, build_database
 from app.ingestion.indexer import Indexer
 from app.providers.embeddings import EmbeddingProvider, build_embedding_provider
 from app.providers.llm import LLMProvider, build_llm_provider
 from app.rag.orchestrator import RAGOrchestrator
-from app.rag.retriever import Retriever, SqliteNumpyVectorStore
+from app.rag.retriever import NumpyVectorStore, Retriever
 
 logger = logging.getLogger(__name__)
 
@@ -18,17 +18,25 @@ logger = logging.getLogger(__name__)
 @dataclass
 class Services:
     settings: Settings
-    db: Database
+    db: BaseDatabase
     embedder: EmbeddingProvider
-    store: SqliteNumpyVectorStore
+    store: NumpyVectorStore
     retriever: Retriever
     llm: LLMProvider
     indexer: Indexer
     orchestrator: RAGOrchestrator
 
     def health(self) -> dict:
+        # DB를 실제로 한 번 조회한다 — 외부 keep-alive ping이 Supabase 무활동 정지까지 막도록(배포 문서 참고)
+        try:
+            db_ok = bool(self.db.ping())
+        except Exception:  # noqa: BLE001
+            logger.exception("DB ping 실패")
+            db_ok = False
         return {
-            "status": "ok",
+            "status": "ok" if db_ok else "degraded",
+            "db_backend": self.db.name,
+            "db_ok": db_ok,
             "llm_provider": self.llm.name,
             "embedding_provider": self.embedder.name,
             "score_threshold": self.settings.score_threshold,
@@ -38,7 +46,8 @@ class Services:
 
 
 def build_services(settings: Settings, *, db_path: str | None = None) -> Services:
-    db = Database(db_path or settings.db_path)
+    # 명시적 db_path(테스트)가 있으면 SQLite, 아니면 DATABASE_URL → Postgres / DATABASE_PATH → SQLite
+    db = build_database(None if db_path else settings.database_url, db_path or settings.db_path)
     embedder = build_embedding_provider(
         settings.resolved_embedding_provider,
         voyage_api_key=settings.voyage_api_key,
@@ -47,7 +56,7 @@ def build_services(settings: Settings, *, db_path: str | None = None) -> Service
         openai_model=settings.openai_embedding_model,
         local_model=settings.local_embedding_model,
     )
-    store = SqliteNumpyVectorStore(db)
+    store = NumpyVectorStore(db)
     retriever = Retriever(store, embedder, top_k=settings.top_k)
     llm = build_llm_provider(
         settings.resolved_llm_provider,

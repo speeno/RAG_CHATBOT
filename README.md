@@ -34,9 +34,14 @@ Fail-Closed 임계값은 프로바이더별 기본값(voyage 0.35 / openai 0.30 
 ### 테스트
 
 ```bash
-cd backend && .venv/bin/python -m pytest -q     # 15 tests (오프라인 프로바이더로 실행, 키 불필요)
+cd backend && .venv/bin/python -m pytest -q     # 15 tests (오프라인 프로바이더로 실행, 키 불필요) + Postgres 테스트는 skip
+TEST_DATABASE_URL=postgresql://localhost/rag_chatbot_test .venv/bin/python -m pytest -q tests/test_postgres.py  # Postgres 어댑터 검증
 cd frontend && npx tsc --noEmit                  # 타입 체크
 ```
+
+### 배포 (무료 티어: Vercel + Render + Supabase)
+
+`DATABASE_URL`(Supabase Postgres Session Pooler)을 설정하면 SQLite 대신 Postgres를 사용합니다. 순서·주의사항은 **[docs/deploy.md](docs/deploy.md)**, Render 설정은 리포 루트 `render.yaml` 참고.
 
 ## 폴더 구조
 
@@ -44,7 +49,8 @@ cd frontend && npx tsc --noEmit                  # 타입 체크
 .
 ├── CLAUDE.md                # Claude Code용 프로젝트 가이드
 ├── README.md
-├── backend/                 # FastAPI + SQLite(문서/청크/대화/로그) — MVP RAG 백엔드
+├── render.yaml              # Render Blueprint(백엔드 무료 티어)
+├── backend/                 # FastAPI + SQLite/Postgres(문서/청크/대화/로그) — MVP RAG 백엔드
 │   ├── app/
 │   │   ├── main.py          # 앱 엔트리 (CORS, lifespan)
 │   │   ├── api/             # routes.py(REST/SSE), schemas.py

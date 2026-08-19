@@ -45,10 +45,13 @@ class Settings(BaseSettings):
     chunk_overlap_chars: int = 150
 
     # Storage / infra
-    database_path: str = "./data/rag.db"
+    database_path: str = "./data/rag.db"          # SQLite (로컬 개발/테스트 기본값)
+    database_url: str | None = None               # postgresql://… 설정 시 Postgres(Supabase) 사용
     cors_origins: str = "http://localhost:3100,http://localhost:3000"
+    cors_origin_regex: str | None = None          # 예: https://.*\.vercel\.app (Vercel Preview 도메인)
 
-    @field_validator("retrieval_score_threshold", "anthropic_api_key", "voyage_api_key", "openai_api_key", mode="before")
+    @field_validator("retrieval_score_threshold", "anthropic_api_key", "voyage_api_key", "openai_api_key",
+                     "database_url", "cors_origin_regex", mode="before")
     @classmethod
     def _empty_to_none(cls, v):
         if isinstance(v, str):
@@ -87,6 +90,10 @@ class Settings(BaseSettings):
     @property
     def cors_origin_list(self) -> list[str]:
         return [o.strip() for o in self.cors_origins.split(",") if o.strip()]
+
+    @property
+    def resolved_db_backend(self) -> str:
+        return "postgres" if self.database_url else "sqlite"
 
     @property
     def resolved_llm_provider(self) -> str:

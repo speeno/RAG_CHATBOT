@@ -1,8 +1,11 @@
-"""SQLite 저장소 — 문서/청크(+임베딩)/대화/상담 로그.
+"""저장소 — 문서/청크(+임베딩)/대화/상담 로그.
 
-MVP는 SQLite 단일 파일을 Document DB · Vector DB · Conversation DB로 함께 사용한다.
-벡터 검색은 numpy 코사인 유사도로 수행하며, VectorStore 인터페이스(retrieval/vector_store.py)
-뒤에 있으므로 pgvector/Qdrant 등으로 교체 가능하다.
+MVP는 단일 관계형 DB를 Document DB · Vector DB · Conversation DB로 함께 사용한다.
+- `SqliteDatabase`  : 로컬 개발/테스트용 단일 파일(기본값, `DATABASE_PATH`)
+- `PostgresDatabase`: 운영용(Supabase 등, `DATABASE_URL`) — `app.core.db_postgres`
+벡터 검색은 numpy 코사인 유사도로 수행하며(`rag/retriever.py`), 임베딩은 float32 바이트열(BLOB/BYTEA)로 저장한다.
+
+모든 SQL은 `?` 플레이스홀더로 작성하고, 구현체의 `_exec()`가 드라이버에 맞게 변환한다.
 """
 from __future__ import annotations
 
@@ -10,12 +13,13 @@ import json
 import sqlite3
 import threading
 import uuid
+from abc import ABC, abstractmethod
 from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterator
 
-SCHEMA = """
+SQLITE_SCHEMA = """
 CREATE TABLE IF NOT EXISTS documents (
   id TEXT PRIMARY KEY,
   document_id TEXT NOT NULL,
@@ -88,6 +92,9 @@ CREATE TABLE IF NOT EXISTS turn_logs (
 CREATE INDEX IF NOT EXISTS idx_turn_logs_message ON turn_logs(message_id);
 """
 
+# 하위 호환 별칭
+SCHEMA = SQLITE_SCHEMA
+
 
 def now_iso() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds")
@@ -97,29 +104,27 @@ def new_id() -> str:
     return uuid.uuid4().hex
 
 
-class Database:
-    def __init__(self, path: Path | str):
-        self.path = Path(path)
-        self.path.parent.mkdir(parents=True, exist_ok=True)
-        self._lock = threading.RLock()
-        with self.connect() as conn:
-            conn.executescript(SCHEMA)
+class BaseDatabase(ABC):
+    """DB 구현체 공통 로직. 서브클래스는 `connect()`·`_exec()`·`_executemany()`·`_MESSAGE_ORDER`·`ping()`만 제공한다."""
+
+    #: messages 정렬 보조 컬럼 (같은 초에 저장된 user/assistant 순서 보장)
+    _MESSAGE_ORDER = "rowid"
+    name = "base"
 
     @contextmanager
-    def connect(self) -> Iterator[sqlite3.Connection]:
-        conn = sqlite3.connect(self.path, check_same_thread=False, timeout=30)
-        conn.row_factory = sqlite3.Row
-        conn.execute("PRAGMA foreign_keys = ON")
-        conn.execute("PRAGMA journal_mode = WAL")
-        try:
-            with self._lock:
-                yield conn
-                conn.commit()
-        except Exception:
-            conn.rollback()
-            raise
-        finally:
-            conn.close()
+    @abstractmethod
+    def connect(self) -> Iterator[Any]: ...
+
+    @abstractmethod
+    def _exec(self, conn: Any, sql: str, params: Any = ()) -> Any:
+        """단일 문장을 실행하고 커서(또는 커서 유사 객체)를 반환한다."""
+
+    @abstractmethod
+    def _executemany(self, conn: Any, sql: str, rows: list[Any]) -> None: ...
+
+    @abstractmethod
+    def ping(self) -> bool:
+        """연결 확인(SELECT 1). keep-alive/health 용."""
 
     # ── documents ────────────────────────────────────────────────
     def insert_document(self, doc: dict[str, Any]) -> dict[str, Any]:
@@ -131,7 +136,7 @@ class Database:
         cols = ",".join(doc.keys())
         qs = ",".join("?" for _ in doc)
         with self.connect() as conn:
-            conn.execute(f"INSERT INTO documents ({cols}) VALUES ({qs})", list(doc.values()))
+            self._exec(conn, f"INSERT INTO documents ({cols}) VALUES ({qs})", list(doc.values()))
         return self.get_document(doc["id"])  # type: ignore[return-value]
 
     def update_document(self, doc_id: str, **fields: Any) -> None:
@@ -139,28 +144,29 @@ class Database:
             return
         sets = ",".join(f"{k}=?" for k in fields)
         with self.connect() as conn:
-            conn.execute(f"UPDATE documents SET {sets} WHERE id=?", [*fields.values(), doc_id])
+            self._exec(conn, f"UPDATE documents SET {sets} WHERE id=?", [*fields.values(), doc_id])
 
     def get_document(self, doc_id: str) -> dict[str, Any] | None:
         with self.connect() as conn:
-            row = conn.execute("SELECT * FROM documents WHERE id=?", (doc_id,)).fetchone()
+            row = self._exec(conn, "SELECT * FROM documents WHERE id=?", (doc_id,)).fetchone()
         return dict(row) if row else None
 
     def list_documents(self) -> list[dict[str, Any]]:
         with self.connect() as conn:
-            rows = conn.execute("SELECT * FROM documents ORDER BY created_at DESC").fetchall()
+            rows = self._exec(conn, "SELECT * FROM documents ORDER BY created_at DESC").fetchall()
         return [dict(r) for r in rows]
 
     def delete_document(self, doc_id: str) -> bool:
         with self.connect() as conn:
-            cur = conn.execute("DELETE FROM documents WHERE id=?", (doc_id,))
+            cur = self._exec(conn, "DELETE FROM documents WHERE id=?", (doc_id,))
         return cur.rowcount > 0
 
     # ── chunks ───────────────────────────────────────────────────
     def replace_chunks(self, doc_id: str, chunks: list[dict[str, Any]]) -> None:
         with self.connect() as conn:
-            conn.execute("DELETE FROM chunks WHERE document_id=?", (doc_id,))
-            conn.executemany(
+            self._exec(conn, "DELETE FROM chunks WHERE document_id=?", (doc_id,))
+            self._executemany(
+                conn,
                 "INSERT INTO chunks (id, document_id, chunk_index, section, content, char_count, embedding, embedding_model)"
                 " VALUES (?,?,?,?,?,?,?,?)",
                 [
@@ -177,11 +183,12 @@ class Database:
                     for c in chunks
                 ],
             )
-            conn.execute("UPDATE documents SET chunk_count=? WHERE id=?", (len(chunks), doc_id))
+            self._exec(conn, "UPDATE documents SET chunk_count=? WHERE id=?", (len(chunks), doc_id))
 
     def list_chunks(self, doc_id: str) -> list[dict[str, Any]]:
         with self.connect() as conn:
-            rows = conn.execute(
+            rows = self._exec(
+                conn,
                 "SELECT id, document_id, chunk_index, section, content, char_count, embedding_model"
                 " FROM chunks WHERE document_id=? ORDER BY chunk_index",
                 (doc_id,),
@@ -191,13 +198,14 @@ class Database:
     def all_indexed_chunks(self) -> list[dict[str, Any]]:
         """활성(active) + 색인 완료(indexed) 문서의 청크만 반환 — PRD §31 (status=active 만 검색)."""
         with self.connect() as conn:
-            rows = conn.execute(
+            rows = self._exec(
+                conn,
                 """
                 SELECT c.id, c.document_id, c.chunk_index, c.section, c.content, c.embedding, c.embedding_model,
                        d.document_id AS business_document_id, d.title, d.category, d.version, d.updated_at, d.effective_date
                 FROM chunks c JOIN documents d ON d.id = c.document_id
                 WHERE d.status='active' AND d.processing_status='indexed' AND c.embedding IS NOT NULL
-                """
+                """,
             ).fetchall()
         return [dict(r) for r in rows]
 
@@ -206,12 +214,12 @@ class Database:
         ts = now_iso()
         with self.connect() as conn:
             if conversation_id:
-                row = conn.execute("SELECT id FROM conversations WHERE id=?", (conversation_id,)).fetchone()
+                row = self._exec(conn, "SELECT id FROM conversations WHERE id=?", (conversation_id,)).fetchone()
                 if row:
-                    conn.execute("UPDATE conversations SET updated_at=? WHERE id=?", (ts, conversation_id))
+                    self._exec(conn, "UPDATE conversations SET updated_at=? WHERE id=?", (ts, conversation_id))
                     return conversation_id
             cid = conversation_id or new_id()
-            conn.execute("INSERT INTO conversations (id, created_at, updated_at) VALUES (?,?,?)", (cid, ts, ts))
+            self._exec(conn, "INSERT INTO conversations (id, created_at, updated_at) VALUES (?,?,?)", (cid, ts, ts))
             return cid
 
     def add_message(self, conversation_id: str, role: str, content: str,
@@ -227,7 +235,8 @@ class Database:
             "created_at": now_iso(),
         }
         with self.connect() as conn:
-            conn.execute(
+            self._exec(
+                conn,
                 "INSERT INTO messages (id, conversation_id, role, content, sources, answerable, created_at) VALUES (?,?,?,?,?,?,?)",
                 list(msg.values()),
             )
@@ -236,12 +245,13 @@ class Database:
         return msg
 
     def list_messages(self, conversation_id: str, limit: int | None = None) -> list[dict[str, Any]]:
-        sql = "SELECT * FROM messages WHERE conversation_id=? ORDER BY created_at ASC, rowid ASC"
+        sql = f"SELECT * FROM messages WHERE conversation_id=? ORDER BY created_at ASC, {self._MESSAGE_ORDER} ASC"
         with self.connect() as conn:
-            rows = conn.execute(sql, (conversation_id,)).fetchall()
+            rows = self._exec(conn, sql, (conversation_id,)).fetchall()
         out = []
         for r in rows:
             d = dict(r)
+            d.pop("seq", None)
             d["sources"] = json.loads(d["sources"] or "[]")
             d["answerable"] = None if d["answerable"] is None else bool(d["answerable"])
             out.append(d)
@@ -259,21 +269,75 @@ class Database:
         cols = ",".join(log.keys())
         qs = ",".join("?" for _ in log)
         with self.connect() as conn:
-            conn.execute(f"INSERT INTO turn_logs ({cols}) VALUES ({qs})", list(log.values()))
+            self._exec(conn, f"INSERT INTO turn_logs ({cols}) VALUES ({qs})", list(log.values()))
 
     def set_feedback(self, message_id: str, rating: str, reason: str | None) -> bool:
         with self.connect() as conn:
-            cur = conn.execute(
-                "UPDATE turn_logs SET feedback=?, feedback_reason=? WHERE message_id=?", (rating, reason, message_id)
+            cur = self._exec(
+                conn, "UPDATE turn_logs SET feedback=?, feedback_reason=? WHERE message_id=?", (rating, reason, message_id)
             )
         return cur.rowcount > 0
 
     def list_turn_logs(self, limit: int = 100) -> list[dict[str, Any]]:
         with self.connect() as conn:
-            rows = conn.execute("SELECT * FROM turn_logs ORDER BY created_at DESC LIMIT ?", (limit,)).fetchall()
+            rows = self._exec(conn, "SELECT * FROM turn_logs ORDER BY created_at DESC LIMIT ?", (limit,)).fetchall()
         out = []
         for r in rows:
             d = dict(r)
             d["retrieved"] = json.loads(d["retrieved"] or "[]")
             out.append(d)
         return out
+
+
+class SqliteDatabase(BaseDatabase):
+    """SQLite 단일 파일 구현 — 로컬 개발/테스트 기본값."""
+
+    _MESSAGE_ORDER = "rowid"
+    name = "sqlite"
+
+    def __init__(self, path: Path | str):
+        self.path = Path(path)
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        self._lock = threading.RLock()
+        with self.connect() as conn:
+            conn.executescript(SQLITE_SCHEMA)
+
+    @contextmanager
+    def connect(self) -> Iterator[sqlite3.Connection]:
+        conn = sqlite3.connect(self.path, check_same_thread=False, timeout=30)
+        conn.row_factory = sqlite3.Row
+        conn.execute("PRAGMA foreign_keys = ON")
+        conn.execute("PRAGMA journal_mode = WAL")
+        try:
+            with self._lock:
+                yield conn
+                conn.commit()
+        except Exception:
+            conn.rollback()
+            raise
+        finally:
+            conn.close()
+
+    def _exec(self, conn: sqlite3.Connection, sql: str, params: Any = ()) -> sqlite3.Cursor:
+        return conn.execute(sql, params)
+
+    def _executemany(self, conn: sqlite3.Connection, sql: str, rows: list[Any]) -> None:
+        conn.executemany(sql, rows)
+
+    def ping(self) -> bool:
+        with self.connect() as conn:
+            conn.execute("SELECT 1").fetchone()
+        return True
+
+
+# 하위 호환: 기존 코드/테스트가 `Database(path)`를 쓰던 것을 유지
+Database = SqliteDatabase
+
+
+def build_database(database_url: str | None, sqlite_path: Path | str) -> BaseDatabase:
+    """`DATABASE_URL`(postgres://…)이 있으면 Postgres, 없으면 SQLite."""
+    if database_url:
+        from app.core.db_postgres import PostgresDatabase
+
+        return PostgresDatabase(database_url)
+    return SqliteDatabase(sqlite_path)

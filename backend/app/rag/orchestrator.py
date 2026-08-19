@@ -11,7 +11,7 @@ from dataclasses import dataclass, field
 from typing import Any, Iterator
 
 from app.core.config import NO_ANSWER_MESSAGE
-from app.core.db import Database, new_id
+from app.core.db import BaseDatabase, new_id
 from app.providers.llm import ChatMessage, LLMProvider
 from app.rag.retriever import RetrievedChunk, Retriever
 
@@ -52,7 +52,7 @@ class ChatTurn:
 
 
 class RAGOrchestrator:
-    def __init__(self, *, db: Database, retriever: Retriever, llm: LLMProvider, score_threshold: float,
+    def __init__(self, *, db: BaseDatabase, retriever: Retriever, llm: LLMProvider, score_threshold: float,
                  max_context_chunks: int = 5, history_turns: int = 6, embedding_name: str = "", llm_name: str = ""):
         self.db = db
         self.retriever = retriever
