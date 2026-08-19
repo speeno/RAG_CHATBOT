@@ -1,0 +1,42 @@
+# 백엔드(Render free) 스핀다운 + Supabase(free) 7일 무활동 정지 방지용 keep-alive.
+# /api/health 는 DB를 실제로 SELECT 1 하므로 이 ping 하나로 두 서비스가 모두 "활동 중"으로 집계된다.
+#
+# - GitHub Actions schedule 최소 간격은 5분이지만 지연이 흔하므로 10분으로 설정(Render 스핀다운 기준 15분 유휴).
+# - 리포에 60일간 커밋이 없으면 GitHub가 스케줄 워크플로를 자동 비활성화한다 → Actions 탭에서 다시 Enable.
+# - 대상 URL은 Repository Variable `KEEPALIVE_URL` 로 바꿀 수 있다(없으면 아래 기본값).
+# - Render free 750h/월은 워크스페이스 공유이므로 상시 가동 서비스는 1개만 둘 것.
+name: keepalive
+
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: keepalive
+  cancel-in-progress: true
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      URL: ${{ vars.KEEPALIVE_URL || 'https://rag-chatbot-api-6aqk.onrender.com/api/health' }}
+    steps:
+      - name: GET /api/health (최대 3회, 콜드스타트 대기 포함)
+        run: |
+          for i in 1 2 3; do
+            code=$(curl -sS -m 90 -o /tmp/health.json -w '%{http_code}' "$URL" || echo 000)
+            echo "try $i → HTTP $code"
+            if [ "$code" = "200" ]; then
+              cat /tmp/health.json; echo
+              # db_ok:false 면 Supabase 쪽 문제 → 실패로 표시해 알림이 가게 한다
+              grep -q '"db_ok":true' /tmp/health.json || { echo "::error::db_ok is not true"; exit 1; }
+              exit 0
+            fi
+            sleep 20
+          done
+          echo "::error::health check failed: $URL"
+          exit 1
