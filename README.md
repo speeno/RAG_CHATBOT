@@ -116,4 +116,7 @@ HTML 목업 보기: `docs/design/html/index.html`을 브라우저로 열거나, 
 
 ## 다음 단계 (Phase 2~)
 
+미구현 화면 목록과 제안 순서: [docs/screens-todo.md](docs/screens-todo.md)
+
+
 BM25 + Hybrid Search, LLM 기반 Query Rewrite/Multi Query, Reranker, 골든 데이터셋 기반 Retrieval 평가(Recall@5), 관리자 검색 테스트 화면, 대시보드/미답변 분석, 권한 관리, PII 마스킹.
