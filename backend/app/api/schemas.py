@@ -98,12 +98,30 @@ class DocumentPatch(BaseModel):
 class SearchTestRequest(BaseModel):
     query: str = Field(min_length=1)
     top_k: int = Field(default=10, ge=1, le=50)
+    previous_query: str | None = Field(default=None, max_length=2000)   # 후속 질문 Rewrite 시뮬레이션용(직전 사용자 질문)
+    expected_document_id: str | None = None                            # 정답 문서(document_id 또는 pk) → Top-k Hit 계산
+
+
+class SearchTestHit(BaseModel):
+    top1: bool
+    top3: bool
+    top5: bool
+    rank: int | None   # 정답 문서가 처음 등장한 순위(1-base), 없으면 None
 
 
 class SearchTestResponse(BaseModel):
     query: str
+    normalized_query: str
+    rewritten_query: str | None
+    search_query: str
+    multi_queries: list[str]          # Phase 2(Multi Query) 도입 전까지는 []
     threshold: float
+    passes_threshold: bool            # top1 score >= threshold (아니면 Fail-Closed)
+    top_score: float
     elapsed_ms: int
+    embedding_provider: str
+    indexed_chunks: int
+    hit: SearchTestHit | None
     results: list[dict[str, Any]]
 
 

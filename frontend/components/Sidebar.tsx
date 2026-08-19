@@ -11,6 +11,7 @@ const USER_NAV = [
 ];
 const ADMIN_NAV = [
   { href: "/admin/knowledge", label: "지식베이스", icon: "book-open" },
+  { href: "/admin/search-test", label: "검색 테스트", icon: "search" },
 ];
 
 export function Sidebar() {

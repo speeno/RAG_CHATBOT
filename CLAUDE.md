@@ -39,7 +39,7 @@ Config is `backend/.env` (copy from `.env.example`; **no inline `#` comments on 
 
 ## Frontend (`frontend/`)
 
-App Router, no UI framework; `app/globals.css` carries the design tokens copied from `docs/design/html/shared.css`. `lib/api.ts` is the typed client + SSE parser (keep in sync with `backend/app/api/schemas.py`). Pages: `/` (`components/chat/ChatView.tsx` + `Messages.tsx`: streaming, citation badges, source cards, fail-closed handoff card, 👍/👎 with reasons) and `/admin/knowledge` (`components/admin/KnowledgeView.tsx`: upload with metadata, processing-status polling, activate/deactivate, reindex, delete, chunk preview). `NEXT_PUBLIC_API_URL` defaults to `http://localhost:8000`.
+App Router, no UI framework; `app/globals.css` carries the design tokens copied from `docs/design/html/shared.css`. `lib/api.ts` is the typed client + SSE parser (keep in sync with `backend/app/api/schemas.py`). Pages: `/` (`components/chat/ChatView.tsx` + `Messages.tsx`: streaming, citation badges, source cards, fail-closed handoff card, 👍/👎 with reasons) and `/admin/knowledge` (`components/admin/KnowledgeView.tsx`: upload with metadata, processing-status polling, activate/deactivate, reindex, delete, chunk preview), `/admin/search-test` (`components/admin/SearchTestView.tsx`: query → normalization/rewrite/threshold verdict/Top-k hit/result table/chunk preview via `POST /api/search/test`; BM25/Reranker columns are Phase 2 placeholders). `NEXT_PUBLIC_API_URL` defaults to `http://localhost:8000`.
 
 ## What is being built
 

@@ -1,4 +1,4 @@
-# 미구현 화면 목록 (2026-08-19 기준)
+# 미구현 화면 목록 (2026-08-20 갱신)
 
 목업 10개(`docs/design/mockups`, `docs/design/html`) 와 PRD(§32~§36, §41~§43, §52~§53)를 현재 `frontend/`·`backend/` 구현과 대조한 결과다. 배포된 서비스: https://rag-chatbot-ten-cyan.vercel.app
 
@@ -13,20 +13,20 @@
 | A1 | **대시보드** | `admin/01-dashboard` | §34 | 3 | ❌ 없음 | ❌ 집계 API 없음 | 🔴 미구현 |
 | A2 | 지식베이스 목록/문서 정보 | `admin/02-knowledge-base-list` | §30~31 | 1 | `/admin/knowledge` | `/api/knowledge*` | ✅ 완료 |
 | A3 | 문서 업로드·색인 진행 | `admin/03-document-upload-indexing` | §30 | 1 | `/admin/knowledge` | `/api/knowledge` POST·폴링 | ✅ 완료 |
-| A4 | **검색 테스트** | `admin/04-search-test` | §32 | 2 | ❌ 없음 | ⚠️ `POST /api/search/test` 있음(Vector 점수만) | 🔴 미구현 |
+| A4 | 검색 테스트 | `admin/04-search-test` | §32 | 2 | `/admin/search-test` SearchTestView | `POST /api/search/test`(정규화·Rewrite·임계값·Hit) | ✅ 완료(2026-08-20) — BM25/Reranker 열은 Phase 2 후 채움 |
 | A5 | **상담 로그** | `admin/05-conversation-logs` | §33 | 3 | ❌ 없음 | ⚠️ `GET /api/logs?limit=` 있음(필터/페이징 없음) | 🔴 미구현 |
 | A6 | **미답변 분석** | `admin/06-unanswered-analysis` | §35 | 3 | ❌ 없음 | ❌ 집계 API 없음 | 🔴 미구현 |
 | — | 플로팅 챗봇 위젯 | (목업 없음) | §41 | 선택 | ❌ | — | ⚪ 미구현(선택) |
 | — | 문서 버전 관리 / 권한 관리(RBAC) | (목업 없음) | §29, Phase 3 | 3 | ❌ | ❌ | ⚪ 미구현(화면 설계 필요) |
 
-사이드바(`components/Sidebar.tsx`)에는 현재 `상담하기`, `지식베이스` 두 메뉴만 있다. A1·A4·A5·A6 구현 시 메뉴 추가 필요.
+사이드바(`components/Sidebar.tsx`)에는 현재 `상담하기`, `지식베이스`, `검색 테스트` 메뉴가 있다. A1·A5·A6 구현 시 메뉴 추가 필요.
 
 ---
 
 ## 미구현 화면 상세
 
-### A4. 검색 테스트 — `/admin/search-test` (Phase 2, 우선순위 1)
-목업 `admin/04-search-test.png` · PRD §32. 관리자가 질문을 넣어 검색 과정을 검증하는 화면. **백엔드 API가 이미 있어 가장 먼저 만들 수 있다.**
+### A4. 검색 테스트 — `/admin/search-test` ✅ 구현 완료 (2026-08-20)
+목업 `admin/04-search-test.png` · PRD §32. 구현: `frontend/components/admin/SearchTestView.tsx`, API `POST /api/search/test`(normalized/rewritten/search_query, threshold·passes_threshold·top_score, hit{top1,3,5,rank}, results[rank,score,passes_threshold,bm25_score,rerank_score,content]). 남은 것: BM25/Reranker 점수·Multi Query 후보(Phase 2 하이브리드 검색 후).
 
 화면 요소(목업 기준):
 - 질문 입력 + [검색 실행], 예시 질문 칩, 최근 검색 기록, 설정(Top-K·임계값)
@@ -82,7 +82,7 @@
 ---
 
 ## 제안 구현 순서
-1. **A4 검색 테스트** — API 존재, 1~2일. 품질 튜닝(임계값·Top-K)에 바로 쓰임.
+1. ~~A4 검색 테스트~~ ✅ 완료
 2. **A5 상담 로그** — 데이터 존재, 필터/페이징 API 보강 포함 2일.
 3. **A1 대시보드** — 집계 API 신설, 차트 컴포넌트(외부 라이브러리 없이 SVG) 2~3일.
 4. **A6 미답변 분석** — 대시보드 집계 재사용 + 처리 상태 테이블 2일.

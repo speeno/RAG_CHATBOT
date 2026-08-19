@@ -83,7 +83,7 @@ class RAGOrchestrator:
         yield {"type": "meta", "conversation_id": cid, "message_id": message_id}
 
         # 1) 검색 (대화 맥락을 반영한 검색 쿼리)
-        search_query = self._build_search_query(message, history)
+        search_query = self.build_search_query(message, history)
         rewritten = search_query if search_query != message else None
         retrieval = self.retriever.retrieve(search_query)
         retrieved_log = [c.as_source() for c in retrieval.chunks]
@@ -138,8 +138,8 @@ class RAGOrchestrator:
         yield {"type": "done", "turn": turn}
 
     # ── internals ─────────────────────────────────────────────────
-    def _build_search_query(self, message: str, history: list[dict[str, Any]]) -> str:
-        """간이 Query Rewrite(PRD §19): 짧은 후속 질문이면 직전 사용자 질문을 덧붙여 검색한다."""
+    def build_search_query(self, message: str, history: list[dict[str, Any]]) -> str:
+        """간이 Query Rewrite(PRD §19): 짧은 후속 질문이면 직전 사용자 질문을 덧붙여 검색한다. (검색 테스트 화면에서도 사용)"""
         prev_user = next((m["content"] for m in reversed(history) if m["role"] == "user"), None)
         if not prev_user:
             return message

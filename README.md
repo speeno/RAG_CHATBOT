@@ -111,7 +111,7 @@ HTML 목업 보기: `docs/design/html/index.html`을 브라우저로 열거나, 
 | GET/PATCH/DELETE | `/api/knowledge/{id}` | 상세(원문) / 상태·메타 수정 / 삭제 |
 | GET | `/api/knowledge/{id}/chunks` | 청크 목록 |
 | POST | `/api/knowledge/{id}/reindex` | 재색인 |
-| POST | `/api/search/test` | 검색 테스트(점수·청크 확인) |
+| POST | `/api/search/test` | 검색 테스트(정규화·Rewrite·임계값 판정·정답 문서 Hit·청크) — `/admin/search-test` 화면 |
 | GET | `/api/health` | 프로바이더/임계값/색인 청크 수 |
 
 ## 다음 단계 (Phase 2~)

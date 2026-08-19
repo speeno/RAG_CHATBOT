@@ -26,6 +26,30 @@ export type ChatResponse = {
   model: string | null;
 };
 
+export type SearchTestResult = Source & {
+  rank: number;
+  content: string;
+  passes_threshold: boolean;
+  bm25_score: number | null;
+  rerank_score: number | null;
+};
+
+export type SearchTestResponse = {
+  query: string;
+  normalized_query: string;
+  rewritten_query: string | null;
+  search_query: string;
+  multi_queries: string[];
+  threshold: number;
+  passes_threshold: boolean;
+  top_score: number;
+  elapsed_ms: number;
+  embedding_provider: string;
+  indexed_chunks: number;
+  hit: { top1: boolean; top3: boolean; top5: boolean; rank: number | null } | null;
+  results: SearchTestResult[];
+};
+
 export type Health = {
   status: string;
   db_backend: string;
@@ -99,6 +123,13 @@ async function fetchWithRetry(input: string, init: RequestInit | undefined, retr
 
 export const api = {
   health: () => fetchWithRetry(`${API_URL}/api/health`, { cache: "no-store" }, 2, 800).then(j<Health>),
+
+  searchTest: (body: { query: string; top_k?: number; previous_query?: string | null; expected_document_id?: string | null }) =>
+    fetch(`${API_URL}/api/search/test`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    }).then(j<SearchTestResponse>),
 
   chat: (message: string, conversation_id?: string | null) =>
     fetch(`${API_URL}/api/chat`, {

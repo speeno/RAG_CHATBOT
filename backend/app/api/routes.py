@@ -175,12 +175,46 @@ def reindex_knowledge(doc_id: str, sync: bool = False, svc: Services = Depends(g
 # ── search test (관리자용 검색 디버그, PRD §32) ───────────────────
 @router.post("/search/test", response_model=S.SearchTestResponse)
 def search_test(req: S.SearchTestRequest, svc: Services = Depends(get_services)) -> dict[str, Any]:
-    r = svc.retriever.retrieve(req.query, top_k=req.top_k)
+    """관리자 검색 테스트: 정규화 → (선택) Rewrite → 검색 → 임계값/정답 문서 기준 평가."""
+    normalized = " ".join(req.query.split())
+    history = [{"role": "user", "content": req.previous_query}] if req.previous_query else []
+    search_query = svc.orchestrator.build_search_query(normalized, history)
+    rewritten = search_query if search_query != normalized else None
+    threshold = svc.settings.score_threshold
+
+    r = svc.retriever.retrieve(search_query, top_k=req.top_k)
+    results = []
+    for i, c in enumerate(r.chunks):
+        results.append({
+            **c.as_source(),
+            "rank": i + 1,
+            "content": c.content,
+            "passes_threshold": c.score >= threshold,
+            "bm25_score": None,      # Phase 2: Hybrid(BM25) 도입 시 채움
+            "rerank_score": None,    # Phase 2: Reranker 도입 시 채움
+        })
+
+    hit = None
+    if req.expected_document_id:
+        key = req.expected_document_id
+        rank = next((x["rank"] for x in results if key in (x["document_id"], x["document_pk"])), None)
+        hit = {"top1": rank is not None and rank <= 1, "top3": rank is not None and rank <= 3,
+               "top5": rank is not None and rank <= 5, "rank": rank}
+
     return {
         "query": req.query,
-        "threshold": svc.settings.score_threshold,
+        "normalized_query": normalized,
+        "rewritten_query": rewritten,
+        "search_query": search_query,
+        "multi_queries": [],
+        "threshold": threshold,
+        "passes_threshold": bool(r.chunks) and r.top_score >= threshold,
+        "top_score": round(float(r.top_score), 4),
         "elapsed_ms": r.elapsed_ms,
-        "results": [{**c.as_source(), "content": c.content, "rank": i + 1} for i, c in enumerate(r.chunks)],
+        "embedding_provider": svc.embedder.name,
+        "indexed_chunks": svc.store.size,
+        "hit": hit,
+        "results": results,
     }
 
 

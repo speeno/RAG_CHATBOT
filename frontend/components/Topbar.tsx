@@ -7,6 +7,7 @@ import { api } from "@/lib/api";
 const TITLES: Record<string, string> = {
   "/": "상담하기",
   "/admin/knowledge": "지식베이스 관리",
+  "/admin/search-test": "검색 테스트",
 };
 
 export function Topbar() {

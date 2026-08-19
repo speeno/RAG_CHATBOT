@@ -85,3 +85,27 @@ def test_prompt_injection_in_document_is_treated_as_data(seeded):
     assert r.status_code == 201
     body = seeded.post("/api/chat", json={"message": "환불은 언제까지 가능한가요?"}).json()
     assert "시스템 프롬프트" not in body["answer"]
+
+
+def test_search_test_reports_threshold_rewrite_and_hit(seeded):
+    r = seeded.post("/api/search/test", json={"query": "  환불은   며칠 이내에 신청해야 하나요?  ", "top_k": 5,
+                                              "expected_document_id": "REFUND-001"})
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["normalized_query"] == "환불은 며칠 이내에 신청해야 하나요?"
+    assert body["rewritten_query"] is None and body["search_query"] == body["normalized_query"]
+    assert body["multi_queries"] == []
+    assert body["passes_threshold"] is True and body["top_score"] >= body["threshold"]
+    assert body["indexed_chunks"] > 0 and body["embedding_provider"]
+    assert body["hit"]["top5"] is True and body["hit"]["rank"] is not None
+    top = body["results"][0]
+    assert top["rank"] == 1 and top["passes_threshold"] is True and top["content"]
+    assert "bm25_score" in top and "rerank_score" in top
+
+    # 짧은 후속 질문 + previous_query → Rewrite 적용
+    r2 = seeded.post("/api/search/test", json={"query": "그럼 배송비는?", "previous_query": "배송은 며칠 걸리나요?"})
+    assert r2.json()["rewritten_query"] == "배송은 며칠 걸리나요? 그럼 배송비는?"
+
+    # 근거 없는 질문 → Fail-Closed 판정, 정답 문서 미지정 → hit None
+    r3 = seeded.post("/api/search/test", json={"query": "양자역학 슈뢰딩거 방정식 유도"})
+    assert r3.json()["passes_threshold"] is False and r3.json()["hit"] is None
