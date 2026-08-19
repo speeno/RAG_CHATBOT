@@ -3,6 +3,8 @@
 > 결론: **가능하다.** 단, 무료 티어 제약 때문에 (1) SQLite 대신 Supabase Postgres를 쓰고, (2) Render↔Supabase는 **Session Pooler(IPv4)** 로 연결하며, (3) 콜드스타트/무활동 정지를 감수(또는 keep-alive)해야 한다.
 > 이 리포는 위 사항이 모두 코드에 반영되어 있다(`DATABASE_URL`, `CORS_ORIGIN_REGEX`, `render.yaml`, 프론트 "서버 깨우는 중" 안내).
 
+> 이 절차는 Claude Code 플러그인 **deploy-3tier**(`/plugin marketplace add speeno/claude-plugins` → `/plugin install deploy-3tier@speeno-plugins`)로 다른 프로젝트에도 적용할 수 있다. 설치 가이드: [deploy-3tier-plugin-install.md](deploy-3tier-plugin-install.md)
+
 ## 현재 배포 상태 (2026-08-19)
 
 | 구성 | URL / 식별자 |
