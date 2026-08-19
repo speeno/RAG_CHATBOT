@@ -63,7 +63,8 @@ ul { list-style: none; }
 .status-card { border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px; font-size: 12.5px; color: #6b7487; display: flex; flex-direction: column; gap: 6px; }
 .status-card b { color: var(--text); font-weight: 600; }
 .status-card .row { display: flex; justify-content: space-between; gap: 8px; }
-.status-card .row span:last-child { color: var(--text); text-align: right; word-break: break-all; }
+.status-card .row span:first-child { flex: none; word-break: keep-all; }
+.status-card .row span:last-child { color: var(--text); text-align: right; word-break: break-all; min-width: 0; }
 .tag-offline { display: inline-flex; align-items: center; height: 20px; padding: 0 8px; border-radius: 6px; background: var(--orange-bg); color: #d97706; font-size: 11.5px; font-weight: 600; }
 .tag-live { display: inline-flex; align-items: center; height: 20px; padding: 0 8px; border-radius: 6px; background: var(--green-bg); color: var(--green-text); font-size: 11.5px; font-weight: 600; }
 
@@ -193,7 +194,13 @@ ul { list-style: none; }
 /* ── 관리자: 지식베이스 ─────────────────────────── */
 .kb-head { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 20px; }
 .kb-grid { display: grid; grid-template-columns: minmax(0, 1fr) 420px; gap: 20px; align-items: start; }
-@media (max-width: 1280px) { .kb-grid { grid-template-columns: 1fr; } }
+/* 1501~1600px: 업로드 패널을 좁히고 테이블 여백·진행 막대를 줄여 8열이 잘리지 않게 한다 */
+@media (max-width: 1600px) {
+  .kb-grid { grid-template-columns: minmax(0, 1fr) 340px; }
+  .table th, .table td { padding-left: 10px; padding-right: 10px; }
+}
+/* 그보다 좁으면 업로드 패널을 테이블 아래로 내린다 */
+@media (max-width: 1500px) { .kb-grid { grid-template-columns: 1fr; } }
 .kb-stats { display: flex; gap: 8px; margin-bottom: 14px; flex-wrap: wrap; }
 .kb-stats .stat { height: 34px; padding: 0 12px; border: 1px solid #dfe3ea; border-radius: 9px; display: inline-flex; align-items: center; gap: 8px; font-size: 13.5px; color: #4b5566; background: #fff; }
 .kb-stats .stat b { color: var(--text); font-weight: 700; }
@@ -202,12 +209,17 @@ ul { list-style: none; }
 .table { width: 100%; border-collapse: collapse; }
 .table th { text-align: left; font-size: 13px; font-weight: 500; color: #6b7487; padding: 0 12px; height: 44px; background: #f5f6f9; white-space: nowrap; }
 .table th:first-child, .table td:first-child { padding-left: 18px; }
-.table td { font-size: 13.5px; color: var(--text); padding: 10px 12px; border-top: 1px solid #edf0f5; vertical-align: middle; }
+/* 날짜·버전·배지·버튼이 줄바꿈되지 않도록 하고, 문서명 열만 남는 폭을 차지하게 한다 */
+.table td { font-size: 13.5px; color: var(--text); padding: 10px 12px; border-top: 1px solid #edf0f5; vertical-align: middle; white-space: nowrap; }
+/* max-width:0 트릭: 남는 폭을 문서명 열이 차지하되 내부(파일명)는 말줄임 처리되도록 */
+.table td:first-child { white-space: normal; width: 100%; max-width: 0; min-width: 180px; }
+.table td.cell-cat { max-width: 160px; overflow: hidden; text-overflow: ellipsis; }
 .table tr.selected td { background: #f4f7ff; }
 .table tr:hover td { background: #f8f9fc; }
-.table .doc-name { display: flex; align-items: center; gap: 10px; }
-.table .doc-name b { font-weight: 600; }
-.table .doc-name small { display: block; font-size: 12px; color: #8a94a6; font-weight: 400; }
+.table .doc-name { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.table .doc-name > div { min-width: 0; }
+.table .doc-name b { display: block; font-weight: 600; line-height: 1.35; overflow-wrap: anywhere; }
+.table .doc-name small { display: block; font-size: 12px; color: #8a94a6; font-weight: 400; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .table .acts { display: flex; gap: 6px; justify-content: flex-end; }
 .icon-btn { width: 32px; height: 32px; border-radius: 8px; display: inline-flex; align-items: center; justify-content: center; color: #6b7487; border: 1px solid transparent; }
 .icon-btn:hover { background: #f1f4fa; color: var(--text); border-color: var(--border); }
@@ -219,6 +231,8 @@ ul { list-style: none; }
 .proc .steps i.on { background: var(--primary); }
 .proc .steps i.ok { background: var(--green); }
 .proc .steps i.err { background: var(--red); }
+/* 1600px 이하에서는 진행 막대를 숨기고 배지만 표시 (.kb-grid 규칙 참고) */
+@media (max-width: 1600px) { .proc .steps { display: none; } }
 .upload-card { padding: 20px 20px 18px; position: sticky; top: calc(var(--topbar-h) + 20px); }
 .upload-card h2 { font-size: 16px; font-weight: 700; color: var(--navy); }
 .upload-card .sub { font-size: 12.5px; color: #6b7487; margin-top: 4px; }
@@ -226,7 +240,7 @@ ul { list-style: none; }
 .drop.over, .drop:hover { border-color: var(--primary); background: var(--primary-soft); }
 .drop .cloud { width: 48px; height: 48px; border-radius: 50%; background: var(--primary-soft); color: var(--primary); display: inline-flex; align-items: center; justify-content: center; }
 .drop .cloud .ico { width: 24px; height: 24px; }
-.drop .t1 { font-size: 14px; font-weight: 600; margin-top: 10px; }
+.drop .t1 { font-size: 14px; font-weight: 600; margin-top: 10px; word-break: keep-all; }
 .drop .t2 { font-size: 12.5px; color: #6b7487; margin-top: 4px; }
 .drop .file { margin-top: 10px; font-size: 13px; color: var(--primary-text); font-weight: 600; word-break: break-all; }
 .f-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 14px; margin-top: 14px; }

@@ -123,7 +123,7 @@ export function KnowledgeView() {
                           <div><b>{d.title}</b><small>{d.document_id} · {d.filename ?? d.content_type}</small></div>
                         </div>
                       </td>
-                      <td>{d.category ?? <span className="muted">-</span>}</td>
+                      <td className="cell-cat" title={d.category ?? undefined}>{d.category ?? <span className="muted">-</span>}</td>
                       <td>{d.version ? `v${d.version}` : "-"}</td>
                       <td><span className={`badge ${d.status === "active" ? "green" : "gray"}`}>{d.status === "active" ? "활성" : "비활성"}</span></td>
                       <td><ProcStatus d={d} /></td>

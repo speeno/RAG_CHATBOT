@@ -3,6 +3,28 @@
 > 결론: **가능하다.** 단, 무료 티어 제약 때문에 (1) SQLite 대신 Supabase Postgres를 쓰고, (2) Render↔Supabase는 **Session Pooler(IPv4)** 로 연결하며, (3) 콜드스타트/무활동 정지를 감수(또는 keep-alive)해야 한다.
 > 이 리포는 위 사항이 모두 코드에 반영되어 있다(`DATABASE_URL`, `CORS_ORIGIN_REGEX`, `render.yaml`, 프론트 "서버 깨우는 중" 안내).
 
+## 현재 배포 상태 (2026-08-19)
+
+| 구성 | URL / 식별자 |
+|---|---|
+| 프론트(Vercel, 프로젝트 `rag-chatbot`, 스코프 mudotmusic-6437) | https://rag-chatbot-ten-cyan.vercel.app |
+| 백엔드(Render, `rag-chatbot-api`, free, singapore, `srv-da2qv00n74is738hld7g`) | https://rag-chatbot-api-6aqk.onrender.com (`/api/health`) |
+| DB(Supabase, `rag-chatbot`, ap-southeast-1, ref `ytlprajblmrjfkgjnivv`) | Session Pooler `aws-0-ap-southeast-1.pooler.supabase.com:5432` — 비밀번호는 Render env `DATABASE_URL`에만 있음 |
+
+운영 중 배포 명령(로컬 CLI):
+```bash
+# 백엔드 재배포 (Render는 GitHub 앱 미연결 상태라 push만으로는 자동 배포되지 않음 → 수동 트리거 또는 대시보드에서 GitHub 연결)
+render deploys create srv-da2qv00n74is738hld7g --confirm
+# 프론트 재배포
+cd frontend && vercel deploy --prod --yes --scope mudotmusic-6437s-projects
+# 백엔드 env 변경은 Render 대시보드(Environment) 또는 REST API(PUT /v1/services/{id}/env-vars)
+```
+
+배포 과정에서 확인된 것:
+- CLI 로그인: `render login`(브라우저 승인 → 자동 완료), `supabase login`(브라우저에 뜬 8자리 코드를 **터미널에 입력**해야 완료).
+- Render 서비스 생성 직후 수 분간 `x-render-routing: no-server` 404가 간헐적으로 발생 → `render deploys create`로 한 번 재배포하니 해소. 프론트 `api.health()`는 404/5xx에 짧게 재시도하도록 보강됨.
+- Vercel CLI로 Preview 환경변수 추가가 `api_error`로 실패(Git 미연결 프로젝트) → Production만 설정. Preview를 쓰려면 대시보드에서 `NEXT_PUBLIC_API_URL` 추가.
+
 ## 0. 왜 이 구성인가
 
 | 구성 요소 | 무료 티어 제약 | 이 프로젝트에서의 대응 |
