@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI 상담 도우미 — 상담 로그</title>
+<link rel="stylesheet" href="../shared.css">
+<style>
+  .main { padding: 24px 34px 0 28px; }
+  .head { display: flex; align-items: flex-start; justify-content: space-between; height: 76px; }
+  .head .btn { height: 36px; padding: 0 14px; font-size: 14px; font-weight: 500; color: #4b5566; margin-top: 14px; }
+  .head .btn .ico { width: 17px; height: 17px; }
+  .page-title { font-size: 25px; }
+  .page-sub { font-size: 14px; margin-top: 6px; }
+
+  /* 필터 카드 */
+  .filters { height: 90px; padding: 0 19px 0 20px; display: flex; align-items: center; gap: 24px; margin-top: 0; }
+  .f-group { display: flex; flex-direction: column; }
+  .f-group label { font-size: 12.5px; color: #6b7487; margin-bottom: 8px; }
+  .f-group .select { height: 35px; padding: 0 12px 0 14px; font-size: 13.5px; color: var(--text); border-radius: 8px; }
+  .f-group .select .ico { width: 16px; height: 16px; }
+  .f-group .select .cal { width: 17px; height: 17px; margin-right: 8px; color: #6b7487; }
+  .filters .reset { margin-left: auto; height: 35px; padding: 0 12px; font-size: 13.5px; font-weight: 500; color: #4b5566; border-radius: 8px; align-self: flex-end; margin-bottom: 14px; }
+  .filters .reset .ico { width: 16px; height: 16px; }
+
+  /* 하단 2컬럼 */
+  .cols { display: grid; grid-template-columns: 820px 404px; gap: 16px; margin-top: 20px; }
+  .list-tools { display: flex; align-items: center; justify-content: space-between; height: 37px; }
+  .list-tools .input { width: 345px; height: 37px; font-size: 13.5px; gap: 12px; padding: 0 14px; border-radius: 9px; }
+  .list-tools .input .ico { width: 17px; height: 17px; color: #6b7487; }
+  .list-tools .sl { width: 20px; height: 20px; color: #6b7487; margin-right: 6px; }
+  .count { font-size: 14px; color: #4b5566; margin: 9px 0 10px; }
+
+  .tbl-card { border-radius: 10px; overflow: hidden; }
+  .logs { width: 100%; border-collapse: collapse; table-layout: fixed; }
+  .logs th { height: 42px; background: #f5f6f9; font-size: 12.5px; font-weight: 500; color: #6b7487; text-align: left; padding: 0 8px; }
+  .logs th:first-child { padding-left: 16px; }
+  .logs td { height: 49.5px; font-size: 13.5px; color: var(--text); padding: 0 8px; border-top: 1px solid #edf0f5; white-space: nowrap; }
+  .logs td:first-child { padding-left: 16px; }
+  .logs tr.sel td { background: #eef3fe; }
+  .logs .radio { visibility: hidden; width: 15px; height: 15px; border-radius: 50%; border: 1.5px solid #c9d0dc; display: inline-block; vertical-align: middle; margin-right: 12px; }
+  .logs .radio.on { visibility: visible; border-color: var(--primary); position: relative; }
+  .logs .radio.on::after { content: ''; position: absolute; inset: 2.5px; border-radius: 50%; background: var(--primary); }
+  .logs .st { display: inline-flex; align-items: center; gap: 8px; }
+  .logs .st .dot { width: 7px; height: 7px; background: var(--green); }
+  .logs .sort { display: inline-block; width: 8px; height: 8px; margin-left: 4px; color: #6b7487; vertical-align: -1px; }
+  .logs .sort svg { width: 8px; height: 8px; display: block; }
+  .pager { display: flex; align-items: center; justify-content: space-between; height: 66px; padding: 0 16px 0 20px; }
+  .pages { display: flex; align-items: center; gap: 4px; }
+  .pg { width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 13.5px; color: #4b5566; }
+  .pg.on { background: var(--primary); color: #fff; font-weight: 600; }
+  .pg.nav { border: 1px solid #dfe3ea; border-radius: 8px; width: 34px; height: 30px; color: #b0b7c4; }
+  .pg.nav.on2 { color: #4b5566; margin-left: 6px; }
+  .pg.nav .ico { width: 16px; height: 16px; }
+  .pages .gap { margin: 0 6px; }
+  .per { height: 30px; width: 110px; padding: 0 10px 0 14px; font-size: 13.5px; color: var(--text); border-radius: 8px; }
+  .per .ico { width: 16px; height: 16px; }
+
+  /* 상세 패널 */
+  .detail { border-radius: 10px; padding: 14px 18px 12px 16px; height: 682px; }
+  .d-head { display: flex; align-items: center; justify-content: space-between; height: 22px; }
+  .d-head b { font-size: 14.5px; font-weight: 700; color: var(--text); }
+  .d-head .ico { width: 20px; height: 20px; color: #4b5566; }
+  .d-sec { padding: 11px 0 11px; border-bottom: 1px solid #edf0f5; }
+  .d-sec:last-child { border-bottom: 0; }
+  .d-row { display: flex; align-items: center; justify-content: space-between; }
+  .d-lbl { font-size: 13.5px; font-weight: 700; color: var(--text); }
+  .d-date { font-size: 12.5px; color: #7d8697; }
+  .d-txt { font-size: 13px; color: var(--text); margin-top: 8px; }
+  .doc { display: flex; align-items: center; gap: 10px; margin-top: 8px; }
+  .doc .doc-ico.wrap { width: 26px; height: 26px; border-radius: 6px; }
+  .doc .doc-ico.wrap .ico { width: 16px; height: 16px; }
+  .doc .t { font-size: 13px; font-weight: 600; color: var(--text); }
+  .doc .s { font-size: 12px; color: #7d8697; margin-top: 1px; }
+  .doc .sc { margin-left: auto; font-size: 12.5px; color: #4b5566; }
+  .more { display: flex; align-items: center; justify-content: center; gap: 4px; font-size: 12.5px; color: #6b7487; margin-top: 8px; }
+  .more .ico { width: 14px; height: 14px; }
+  .answer { font-size: 12.5px; color: var(--text); line-height: 1.5; margin-top: 8px; }
+  .meta { display: flex; justify-content: space-between; font-size: 12.5px; color: #4b5566; margin-top: 12px; }
+  .meta b { font-weight: 500; color: var(--text); margin-left: 6px; }
+  .fb-line { display: flex; align-items: center; justify-content: space-between; margin-top: 10px; font-size: 13.5px; color: var(--text); }
+  .fb-line .d-date { }
+  .thanks { font-size: 13px; color: var(--text); margin-top: 12px; }
+</style>
+<script>
+  window.PAGE = {
+    root: '../',
+    nav: [
+      { icon: 'home', label: '홈' },
+      { icon: 'chat', label: '상담하기' },
+      { icon: 'history', label: '상담 로그', active: true },
+      { icon: 'history', label: '상담 이력' },
+      { icon: 'help', label: '도움말' },
+    ],
+    user: { name: '김지현', team: '지원팀', avatar: 'assets/avatar-user2.png' },
+  };
+</script>
+</head>
+<body>
+<div class="app">
+  <main class="main">
+    <div class="head">
+      <div>
+        <h1 class="page-title">상담 로그</h1>
+        <p class="page-sub">사용자 상담 내역과 응답 품질을 확인하고 관리할 수 있습니다.</p>
+      </div>
+      <button class="btn ghost"><i class="ico" data-icon="download"></i> 내보내기</button>
+    </div>
+
+    <section class="card filters">
+      <div class="f-group" style="width:228px">
+        <label>기간</label>
+        <div class="select"><span style="display:flex;align-items:center"><i class="ico cal" data-icon="calendar"></i>2024.05.07 ~ 2024.05.13</span><i class="ico" data-icon="chevron-down"></i></div>
+      </div>
+      <div class="f-group" style="width:118px">
+        <label>피드백 상태</label>
+        <div class="select"><span>전체</span><i class="ico" data-icon="chevron-down"></i></div>
+      </div>
+      <div class="f-group" style="width:125px">
+        <label>카테고리</label>
+        <div class="select"><span>전체</span><i class="ico" data-icon="chevron-down"></i></div>
+      </div>
+      <div class="f-group" style="width:118px">
+        <label>상담 채널</label>
+        <div class="select"><span>전체</span><i class="ico" data-icon="chevron-down"></i></div>
+      </div>
+      <div class="f-group" style="width:118px">
+        <label>담당 부서</label>
+        <div class="select"><span>전체</span><i class="ico" data-icon="chevron-down"></i></div>
+      </div>
+      <button class="btn ghost reset"><i class="ico" data-icon="refresh"></i> 필터 초기화</button>
+    </section>
+
+    <div class="cols">
+      <div>
+        <div class="list-tools">
+          <div class="input"><i class="ico" data-icon="search"></i>사용자 질문으로 검색</div>
+          <i class="ico sl" data-icon="sliders"></i>
+        </div>
+        <div class="count">전체 128건</div>
+        <div class="card tbl-card">
+          <table class="logs">
+            <colgroup>
+              <col style="width:158px"><col style="width:190px"><col style="width:165px"><col style="width:84px"><col style="width:137px"><col>
+            </colgroup>
+            <thead>
+              <tr>
+                <th><span style="visibility:hidden" class="radio"></span>시간<span class="sort"><svg viewBox="0 0 8 8" fill="currentColor"><path d="M4 0l3 4H1z"/></svg></span></th>
+                <th>사용자 질문</th><th>재작성 쿼리</th><th>응답 상태</th><th>피드백</th><th>응답 시간</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr class="sel"><td><span class="radio on"></span>2024.05.13 10:30</td><td>환불은 어떻게 신청하나요?</td><td>환불 신청 절차 및 유의사항</td><td><span class="st"><i class="dot"></i>성공</span></td><td>도움이 됐어요 👍</td><td>2.3초</td></tr>
+              <tr><td><span class="radio"></span>2024.05.13 10:12</td><td>배송이 얼마나 걸리나요?</td><td>배송 기간 및 배송 조회 방법</td><td><span class="st"><i class="dot"></i>성공</span></td><td>도움이 됐어요 👍</td><td>1.8초</td></tr>
+              <tr><td><span class="radio"></span>2024.05.13 09:58</td><td>요금제 변경은 어디서 하나요?</td><td>요금제 변경 방법 안내</td><td><span class="st"><i class="dot"></i>성공</span></td><td>보통이에요 😐</td><td>1.6초</td></tr>
+              <tr><td><span class="radio"></span>2024.05.13 09:45</td><td>비밀번호를 잊어버렸어요</td><td>비밀번호 재설정 방법</td><td><span class="st"><i class="dot"></i>성공</span></td><td>도움이 됐어요 👍</td><td>1.4초</td></tr>
+              <tr><td><span class="radio"></span>2024.05.13 09:32</td><td>결제 영수증을 받고 싶어요</td><td>결제 영수증 발급 방법</td><td><span class="st"><i class="dot"></i>성공</span></td><td>도움이 됐어요 👍</td><td>2.1초</td></tr>
+              <tr><td><span class="radio"></span>2024.05.12 16:40</td><td>기업용 요금제 문의</td><td>기업용 요금제 상담 안내</td><td><span class="st"><i class="dot"></i>성공</span></td><td>도움이 됐어요 👍</td><td>2.7초</td></tr>
+              <tr><td><span class="radio"></span>2024.05.12 15:21</td><td>무료 체험 기간은 얼마나 되나요?</td><td>무료 체험 기간 안내</td><td><span class="st"><i class="dot"></i>성공</span></td><td>보통이에요 😐</td><td>1.5초</td></tr>
+              <tr><td><span class="radio"></span>2024.05.12 14:05</td><td>서비스 장애 현황 알려주세요</td><td>서비스 장애 상태 확인</td><td><span class="st"><i class="dot"></i>성공</span></td><td>도움이 안 돼요 👎</td><td>3.2초</td></tr>
+              <tr><td><span class="radio"></span>2024.05.12 11:33</td><td>회원 탈퇴는 어떻게 하나요?</td><td>회원 탈퇴 절차 안내</td><td><span class="st"><i class="dot"></i>성공</span></td><td>도움이 됐어요 👍</td><td>1.9초</td></tr>
+              <tr><td><span class="radio"></span>2024.05.12 10:11</td><td>청구서 확인 방법</td><td>청구서 확인 및 다운로드 방법</td><td><span class="st"><i class="dot"></i>성공</span></td><td>보통이에요 😐</td><td>1.7초</td></tr>
+            </tbody>
+          </table>
+          <div class="pager">
+            <div class="pages">
+              <span class="pg nav"><i class="ico" data-icon="chevron-left"></i></span>
+              <span class="pg on">1</span><span class="pg">2</span><span class="pg">3</span><span class="pg">4</span><span class="pg">5</span>
+              <span class="pg gap">...</span><span class="pg">13</span>
+              <span class="pg nav on2"><i class="ico" data-icon="chevron-right"></i></span>
+            </div>
+            <div class="select per"><span>10 / 페이지</span><i class="ico" data-icon="chevron-down"></i></div>
+          </div>
+        </div>
+      </div>
+
+      <aside class="card detail">
+        <div class="d-head"><b>상담 상세 정보</b><i class="ico" data-icon="x"></i></div>
+        <div class="d-sec" style="padding-top:16px">
+          <div class="d-row"><span class="d-lbl">원본 질문</span><span class="d-date">2024.05.13 10:30</span></div>
+          <div class="d-txt">환불은 어떻게 신청하나요?</div>
+        </div>
+        <div class="d-sec">
+          <div class="d-row"><span class="d-lbl">재작성 쿼리</span></div>
+          <div class="d-txt">환불 신청 절차 및 유의사항</div>
+        </div>
+        <div class="d-sec">
+          <div class="d-row"><span class="d-lbl">검색된 문서</span><span class="d-date">총 3개 문서</span></div>
+          <div class="doc"><div class="doc-ico wrap"><i class="ico" data-icon="file-text"></i></div><div><div class="t">환불 및 교환 정책</div><div class="s">정책 문서 • v2.3</div></div><span class="sc">점수 0.92</span></div>
+          <div class="doc"><div class="doc-ico wrap"><i class="ico" data-icon="file-text"></i></div><div><div class="t">주문/배송 안내</div><div class="s">가이드 문서 • v1.8</div></div><span class="sc">점수 0.78</span></div>
+          <div class="doc"><div class="doc-ico wrap"><i class="ico" data-icon="file-text"></i></div><div><div class="t">결제/환불 FAQ</div><div class="s">FAQ 문서 • v1.5</div></div><span class="sc">점수 0.71</span></div>
+          <div class="more">더보기 <i class="ico" data-icon="chevron-down"></i></div>
+        </div>
+        <div class="d-sec">
+          <div class="d-row"><span class="d-lbl">최종 답변</span></div>
+          <div class="answer">환불은 상품 수령 후 7일 이내에 신청하실 수 있습니다.<br>마이페이지 &gt; 주문/배송 내역에서 해당 주문을 선택한<br>후 '환불 신청' 버튼을 클릭해 주세요. 환불 승인 후 영업일<br>기준 3~5일 내에 결제하신 수단으로 환불 금액이 지급됩니다.</div>
+          <div class="meta"><span>응답 시간<b>2.3초</b></span><span>모델<b>GPT-4o</b></span></div>
+        </div>
+        <div class="d-sec">
+          <div class="d-row"><span class="d-lbl">사용자 피드백</span></div>
+          <div class="fb-line"><span>도움이 됐어요 👍</span><span class="d-date">2024.05.13 10:31</span></div>
+          <div class="thanks">정말 감사합니다!</div>
+        </div>
+      </aside>
+    </div>
+  </main>
+</div>
+<script src="../shell.js"></script>
+</body>
+</html>

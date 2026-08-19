@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI 상담 도우미 — 상담하기 (미답변 · 상담원 연결)</title>
+<link rel="stylesheet" href="../shared.css">
+<style>
+  .main { padding: 18px 24px 0 21px; }
+  .head { display: flex; align-items: center; height: 44px; margin-bottom: 17px; }
+  .head .back { width: 24px; height: 24px; color: #4b5566; margin-left: 20px; }
+  .head h1 { font-size: 20px; font-weight: 700; color: var(--navy); margin-left: 24px; letter-spacing: -0.02em; }
+  .head .btn { margin-left: auto; margin-right: 0; height: 44px; padding: 0 18px; font-size: 15px; font-weight: 500; color: #2b3445; }
+  .head .btn .ico { width: 18px; height: 18px; }
+
+  .cols { display: flex; gap: 18px; height: 813px; }
+  .chat-card { flex: 1; border-radius: 12px; padding: 20px 26px 0 25px; position: relative; }
+  .u-row { display: flex; justify-content: flex-end; }
+  .u-row .bubble-user { width: 343px; height: 73px; padding: 14px 16px 10px 24px; font-size: 15px; display: flex; flex-direction: column; align-items: flex-end; border-radius: 10px; }
+  .u-row .bubble-user span { align-self: flex-start; }
+  .u-row .bubble-user .time { margin-top: 5px; }
+
+  .b-row { display: flex; gap: 20px; margin-top: 27px; align-items: flex-start; }
+  .b-row .bot-avatar { margin-top: 1px; }
+  .b-row .bubble-bot { width: 613px; height: 120px; padding: 15px 18px 12px; font-size: 15px; line-height: 1.5; position: relative; border-radius: 10px; }
+  .b-row .bubble-bot p + p { margin-top: 12px; }
+  .b-row .bubble-bot .time { position: absolute; right: 16px; bottom: 10px; }
+
+  .notice {
+    margin: 22px 0 0 67px; width: 626px; height: 145px; border-radius: 12px;
+    background: #f2f6fd; border: 1px solid #dfe7fa; display: flex; align-items: flex-start; padding: 22px 0 0 14px;
+  }
+  .notice img { width: 84px; height: 92px; margin-top: 8px; }
+  .notice .txt { margin-left: 16px; }
+  .notice .txt b { display: block; font-size: 19px; font-weight: 700; color: var(--navy); letter-spacing: -0.02em; margin-bottom: 8px; }
+  .notice .txt p { font-size: 15px; color: #4b5566; line-height: 1.6; }
+  .notice .txt p.strong { color: #2b3445; font-weight: 500; }
+
+  .options { margin: 18px 0 0 67px; width: 626px; height: 227px; border-radius: 12px; padding: 16px 14px 0 14px; }
+  .options .lbl { font-size: 15px; color: #2b3445; margin-bottom: 14px; }
+  .opt-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 19px; }
+  .opt {
+    height: 160px; border: 1px solid var(--border); border-radius: 10px; padding: 18px 12px 0 16px; position: relative;
+  }
+  .opt .t { display: flex; align-items: center; gap: 12px; font-size: 15.5px; font-weight: 600; color: var(--text); }
+  .opt .t .ico { width: 22px; height: 22px; color: var(--primary); }
+  .opt .d { font-size: 13.5px; color: #4b5566; line-height: 1.55; margin-top: 12px; }
+  .opt .ob {
+    position: absolute; left: 16px; right: 16px; bottom: 15px; height: 34px; border-radius: 6px;
+    background: #f1f5fd; border: 1px solid #c8d6fb; color: var(--primary-text); font-size: 15px; font-weight: 500;
+    display: flex; align-items: center; justify-content: center;
+  }
+
+  .chat-input { position: absolute; left: 25px; right: 26px; top: 676px; height: 90px; border-radius: 10px; }
+  .chat-input .ph { top: 15px; left: 20px; }
+  .chat-input .clip { left: 21px; bottom: 16px; }
+  .chat-input .send { top: 13px; right: 15px; height: 41px; padding: 0 20px 0 18px; font-size: 15px; font-weight: 500; }
+  .chat-input .send .ico { width: 18px; height: 18px; }
+  .chat-input .hint { bottom: 9px; right: 20px; }
+  .chat-note { position: absolute; left: 25px; top: 776px; font-size: 13px; }
+  .chat-note .ico { width: 15px; height: 15px; }
+
+  /* 우측 문의 접수 */
+  .form-card { width: 334px; border-radius: 12px; padding: 24px 20px 0; }
+  .form-card h2 { font-size: 22px; font-weight: 700; color: var(--navy); letter-spacing: -0.02em; }
+  .form-card .sub { font-size: 14px; color: #6b7487; margin-top: 10px; line-height: 1.6; }
+  .form-card .lbl { font-size: 15px; color: #2b3445; margin: 27px 0 8px; display: block; }
+  .form-card .lbl:first-of-type { margin-top: 30px; }
+  .form-card .lbl small { font-size: 13px; color: #8a94a6; }
+  .form-card .select { height: 45px; color: #2b3445; }
+  .form-card .ta {
+    height: 79px; border: 1px solid #dfe3ea; border-radius: 10px; padding: 12px 14px; font-size: 14px; color: #2b3445; position: relative;
+  }
+  .form-card .ta::after { content: ''; position: absolute; right: 5px; bottom: 5px; width: 8px; height: 8px; border-right: 1.5px solid #b0b7c6; border-bottom: 1.5px solid #b0b7c6; }
+  .seg { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+  .seg .s {
+    height: 37px; border: 1px solid #dfe3ea; border-radius: 8px; display: flex; align-items: center; justify-content: center; gap: 8px;
+    font-size: 14px; color: #4b5566; background: #fff;
+  }
+  .seg .s .ico { width: 17px; height: 17px; }
+  .seg .s.on { background: var(--primary-soft); border-color: var(--primary); color: var(--primary-text); font-weight: 500; }
+  .seg .s.on .ico { color: var(--primary); }
+  .form-card .input { height: 39px; font-size: 14px; }
+  .form-card .submit {
+    margin-top: 29px; height: 44px; width: 100%; border-radius: 8px; background: var(--primary); color: #fff; font-size: 16px; font-weight: 600;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .form-card .foot { text-align: center; font-size: 12.5px; color: #6b7487; margin-top: 13px; }
+</style>
+<script>
+  window.PAGE = {
+    root: '../',
+    nav: [
+      { icon: 'home', label: '홈' },
+      { icon: 'chat', label: '상담하기', active: true },
+      { icon: 'history', label: '상담 이력' },
+      { icon: 'help', label: '도움말' },
+    ],
+    user: { name: '김지현', team: '지민팀', avatar: 'assets/avatar-user2.png' },
+  };
+</script>
+</head>
+<body>
+<div class="app">
+  <main class="main">
+    <div class="head">
+      <i class="ico back" data-icon="arrow-left"></i>
+      <h1>상담하기</h1>
+      <button class="btn"><i class="ico" data-icon="refresh"></i> 새 상담 시작</button>
+    </div>
+
+    <div class="cols">
+      <section class="card chat-card">
+        <div class="u-row">
+          <div class="bubble-user"><span>VIP 고객도 해외배송 시 배송비가 무료인가요?</span><span class="time">오전 10:32</span></div>
+        </div>
+        <div class="b-row">
+          <img class="bot-avatar" src="../assets/avatar-bot.png" alt="">
+          <div class="bubble-bot">
+            <p>해당 질문에 대해 확인해 보았으나, 현재 등록된 자료에서는 충분한 정보를 찾지 못했습니다.</p>
+            <p>더 정확한 안내를 위해 상담원 연결 또는 문의 접수를 도와드리겠습니다.</p>
+            <span class="time">오전 10:32</span>
+          </div>
+        </div>
+
+        <div class="notice">
+          <img src="../assets/shield.png" alt="">
+          <div class="txt">
+            <b>현재 등록된 자료에서는 해당 내용을 확인하기 어렵습니다.</b>
+            <p>AI가 보유한 지식 범위를 벗어난 질문이거나,<br>관련 정책이 최신화되지 않았을 수 있습니다.</p>
+            <p class="strong">전문 상담원의 도움을 받아보세요.</p>
+          </div>
+        </div>
+
+        <div class="card options">
+          <div class="lbl">다음 중 원하시는 방법을 선택해주세요.</div>
+          <div class="opt-grid">
+            <div class="opt">
+              <div class="t"><i class="ico" data-icon="headphones"></i> 상담원 연결</div>
+              <div class="d">지금 바로 전문 상담원과<br>채팅으로 연결됩니다.</div>
+              <div class="ob">연결하기</div>
+            </div>
+            <div class="opt">
+              <div class="t"><i class="ico" data-icon="mail"></i> 문의 남기기</div>
+              <div class="d">답변이 등록되면 이메일 또는<br>알림으로 안내드립니다.</div>
+              <div class="ob">문의 접수</div>
+            </div>
+            <div class="opt">
+              <div class="t"><i class="ico" data-icon="file-text"></i> 관련 정책 보기</div>
+              <div class="d">해외배송 및 VIP 등급 관련<br>정책을 확인해 보세요.</div>
+              <div class="ob">정책 보기</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="chat-input">
+          <span class="ph">궁금한 내용을 입력해 주세요...</span>
+          <i class="ico clip" data-icon="paperclip"></i>
+          <button class="send"><i class="ico" data-icon="send"></i> 전송</button>
+          <span class="hint">Enter로 전송 &nbsp;/&nbsp; Shift + Enter로 줄바꿈</span>
+        </div>
+        <div class="chat-note"><i class="ico" data-icon="shield-check"></i> AI 상담 도우미는 내부 문서를 기반으로 답변하며, 부정확한 정보가 있다면 피드백을 남겨주세요.</div>
+      </section>
+
+      <aside class="card form-card">
+        <h2>문의 접수</h2>
+        <p class="sub">정확한 답변을 위해 정보를 입력해 주세요.<br>접수 후 빠르게 확인하여 안내드리겠습니다.</p>
+
+        <span class="lbl">문의 카테고리</span>
+        <div class="select"><span>배송 &gt; 해외배송</span><i class="ico" data-icon="chevron-down"></i></div>
+
+        <span class="lbl">문의 내용 요약 <small>(선택)</small></span>
+        <div class="ta">VIP 고객 해외배송 무료 여부 문의</div>
+
+        <span class="lbl">긴급도</span>
+        <div class="seg"><div class="s">낮음</div><div class="s on">보통</div><div class="s">높음</div></div>
+
+        <span class="lbl">선호 연락 방법</span>
+        <div class="seg">
+          <div class="s on"><i class="ico" data-icon="mail"></i> 이메일</div>
+          <div class="s"><i class="ico" data-icon="phone"></i> 전화</div>
+          <div class="s"><i class="ico" data-icon="message-square"></i> 채팅 알림</div>
+        </div>
+
+        <span class="lbl">이메일 주소</span>
+        <div class="input">kim.jihyun@example.com</div>
+
+        <div class="submit">문의 접수하기</div>
+        <div class="foot">접수 후, 등록된 연락처로 회신드리겠습니다.</div>
+      </aside>
+    </div>
+  </main>
+</div>
+<script src="../shell.js"></script>
+</body>
+</html>

@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI 상담 도우미 — 피드백</title>
+<link rel="stylesheet" href="../shared.css">
+<style>
+  .main { padding: 22px 48px 0 38px; }
+  .back { display: flex; align-items: center; gap: 12px; font-size: 15px; color: #4b5566; padding-left: 6px; height: 22px; }
+  .back .ico { width: 20px; height: 20px; color: #4b5566; }
+
+  /* 카드 1: 최근 AI 답변 */
+  .answer-card { margin-top: 14px; height: 340px; padding: 20px 22px 0 22px; display: flex; gap: 26px; }
+  .answer-card .bot-avatar { width: 46px; height: 46px; margin-top: 0; }
+  .answer-body { flex: 1; position: relative; }
+  .answer-body .a-title { font-size: 16px; font-weight: 700; color: var(--text); margin-top: 3px; }
+  .answer-body .a-time { position: absolute; right: 2px; top: 6px; font-size: 14px; color: #6b7487; }
+  .answer-body .a-q { font-size: 16px; color: var(--text); margin-top: 12px; }
+  .answer-body .a-q b { font-weight: 600; margin-left: 10px; }
+  .answer-body .a-text { font-size: 15px; line-height: 25px; color: var(--text); margin-top: 12px; }
+  .answer-body .source-card { width: 645px; margin-top: 12px; padding: 12px 16px 12px 16px; height: 84px; }
+  .answer-body .source-card .sc-row .doc-ico { width: 24px; height: 24px; }
+  .answer-body .fb { display: flex; align-items: center; gap: 12px; margin-top: 18px; }
+  .answer-body .fb .q { font-size: 14.5px; color: #6b7487; margin-right: 6px; }
+  .answer-body .fb .fb-btn { height: 40px; padding: 0 16px; font-size: 14.5px; }
+  .answer-body .fb .fb-btn .ico { width: 20px; height: 20px; }
+
+  /* 카드 2: 부족한 점 */
+  .reason-card { margin-top: 15px; height: 470px; padding: 26px 22px 0 24px; }
+  .reason-card h2 { font-size: 20px; font-weight: 700; color: var(--navy); }
+  .reason-card .sub { font-size: 14.5px; color: #4b5566; margin-top: 12px; }
+  .tiles { display: grid; grid-template-columns: repeat(5, 1fr); gap: 16px; margin-top: 18px; }
+  .tile {
+    height: 60px; border: 1px solid #dfe3ea; border-radius: 10px; background: #fff;
+    display: flex; align-items: center; gap: 12px; padding: 0 30px; font-size: 15px; color: var(--text);
+  }
+  .tile .ico { width: 22px; height: 22px; color: #6b7487; }
+  .tile .ico.red { color: var(--red); }
+  .tile .ico.dots { width: 20px; height: 20px; }
+  .lbl { font-size: 14.5px; font-weight: 600; color: var(--text); margin-top: 22px; }
+  .lbl span { font-weight: 400; color: #6b7487; margin-left: 4px; }
+  .textarea { margin-top: 10px; height: 86px; border: 1px solid #dfe3ea; border-radius: 10px; background: #fff; position: relative; }
+  .textarea .ph { position: absolute; left: 16px; top: 15px; font-size: 14.5px; color: #98a1b3; }
+  .textarea .cnt { position: absolute; right: 14px; bottom: 8px; font-size: 13px; color: #98a1b3; }
+  .toggle-row { display: flex; align-items: flex-start; gap: 16px; margin-top: 22px; }
+  .switch { width: 50px; height: 24px; border-radius: 12px; background: var(--primary); position: relative; flex: none; margin-top: 0; }
+  .switch::after { content: ''; position: absolute; right: 3px; top: 3px; width: 18px; height: 18px; border-radius: 50%; background: #fff; }
+  .toggle-text .t1 { display: flex; align-items: center; gap: 8px; font-size: 15px; font-weight: 600; color: var(--text); }
+  .toggle-text .t1 .ico { width: 18px; height: 18px; color: #6b7487; }
+  .toggle-text .t2 { font-size: 13px; color: #6b7487; margin-top: 8px; }
+  .reason-card .divider { margin-top: 24px; }
+  .footer { display: flex; align-items: center; margin-top: 14px; }
+  .footer .note { display: flex; align-items: center; gap: 8px; font-size: 13.5px; color: #4b5566; padding-left: 4px; }
+  .footer .note .ico { width: 18px; height: 18px; color: var(--primary); }
+  .footer .btns { margin-left: auto; display: flex; gap: 14px; }
+  .footer .btn { height: 50px; font-size: 15.5px; }
+  .footer .btn.ghost { width: 100px; color: var(--text); font-weight: 600; }
+  .footer .btn.primary { width: 153px; }
+</style>
+<script>
+  window.PAGE = {
+    root: '../',
+    nav: [
+      { icon: 'home', label: '홈' },
+      { icon: 'chat', label: '상담하기' },
+      { icon: 'history', label: '상담 이력', active: true },
+      { icon: 'help', label: '도움말' },
+    ],
+    user: { name: '김지현', team: '지원팀', avatar: 'assets/avatar-user2.png' },
+  };
+</script>
+</head>
+<body>
+<div class="app">
+  <main class="main">
+    <a class="back" href="#"><i class="ico" data-icon="arrow-left"></i> 상담 이력으로 돌아가기</a>
+
+    <section class="card answer-card">
+      <img class="bot-avatar" src="../assets/avatar-bot.png" alt="">
+      <div class="answer-body">
+        <div class="a-title">최근 AI 답변</div>
+        <div class="a-time">오늘 10:30</div>
+        <div class="a-q">질문: <b>환불은 어떻게 신청하나요?</b></div>
+        <p class="a-text">환불은 상품 수령 후 7일 이내에 신청하실 수 있습니다.<br>
+        마이페이지 &gt; 주문/배송 내역에서 해당 주문을 선택한 후 ‘환불 신청’ 버튼을 클릭해 주세요.<br>
+        환불 승인 후 영업일 기준 3~5일 내에 결제하신 수단으로 환불 금액이 지급됩니다.</p>
+        <div class="source-card">
+          <div class="sc-label">출처</div>
+          <div class="sc-row">
+            <i class="ico doc-ico" data-icon="file-fill"></i>
+            <div>
+              <div class="sc-title">환불 및 교환 정책</div>
+              <div class="sc-sub">정책 문서 &nbsp;•&nbsp; v2.3</div>
+            </div>
+            <div class="sc-date"><span>업데이트: 2024. 05. 10.</span><i class="ico" data-icon="external"></i></div>
+          </div>
+        </div>
+        <div class="fb">
+          <span class="q">이번 답변이 도움이었나요?</span>
+          <button class="fb-btn"><i class="ico" data-icon="thumbs-up"></i> 도움이 되었어요</button>
+          <button class="fb-btn active"><i class="ico" data-icon="thumbs-down"></i> 도움이 되지 않았어요</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="card reason-card">
+      <h2>어떤 점이 부족했나요?</h2>
+      <div class="sub">여러 항목을 선택할 수 있습니다.</div>
+      <div class="tiles">
+        <div class="tile"><i class="ico red" data-icon="x-circle"></i> 답변이 틀렸어요</div>
+        <div class="tile"><i class="ico" data-icon="help"></i> 질문과 관련 없어요</div>
+        <div class="tile"><i class="ico" data-icon="message-square"></i> 설명이 부족해요</div>
+        <div class="tile"><i class="ico" data-icon="calendar"></i> 최신 정보가 아니에요</div>
+        <div class="tile"><i class="ico dots" data-icon="more-h"></i> 기타</div>
+      </div>
+
+      <div class="lbl">추가 의견 <span>(선택)</span></div>
+      <div class="textarea">
+        <span class="ph">자세한 의견을 입력해 주세요.</span>
+        <span class="cnt">0 / 500</span>
+      </div>
+
+      <div class="toggle-row">
+        <div class="switch"></div>
+        <div class="toggle-text">
+          <div class="t1">상담원에게 전달 <i class="ico" data-icon="help"></i></div>
+          <div class="t2">선택 시 상담원이 내용을 확인하고 필요한 조치를 진행할 수 있습니다.</div>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="footer">
+        <div class="note"><i class="ico" data-icon="info"></i> 여러분의 소중한 피드백은 더 정확하고 유용한 답변을 만드는 데 큰 도움이 됩니다.</div>
+        <div class="btns">
+          <button class="btn ghost">취소</button>
+          <button class="btn primary">피드백 제출</button>
+        </div>
+      </div>
+    </section>
+  </main>
+</div>
+<script src="../shell.js"></script>
+</body>
+</html>

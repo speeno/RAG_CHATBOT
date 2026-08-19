@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI 상담 도우미 — HTML 목업 인덱스</title>
+<link rel="stylesheet" href="shared.css">
+<style>
+  body { display: block; min-width: 0; padding: 48px 40px; background: #f2f4f8; }
+  .wrap { max-width: 1400px; margin: 0 auto; }
+  h1 { font-size: 28px; font-weight: 800; color: var(--navy); letter-spacing: -0.02em; }
+  .desc { color: #6b7487; margin-top: 8px; font-size: 15px; }
+  .desc code { font-size: 13px; background: #e9ecf2; padding: 2px 6px; border-radius: 5px; }
+  h2 { font-size: 18px; font-weight: 700; color: var(--navy); margin: 40px 0 16px; display: flex; align-items: center; gap: 10px; }
+  h2 .badge { font-size: 12px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 20px; }
+  .tile { background: #fff; border: 1px solid var(--border); border-radius: 14px; overflow: hidden; box-shadow: var(--shadow); display: block; transition: transform .15s, box-shadow .15s; }
+  .tile:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(20,30,60,.10); }
+  .thumb { aspect-ratio: 1586 / 992; overflow: hidden; background: #f8f9fc; border-bottom: 1px solid var(--border); position: relative; }
+  .thumb iframe { width: 1586px; height: 992px; border: 0; transform-origin: 0 0; pointer-events: none; }
+  .thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .meta { padding: 14px 16px 16px; }
+  .meta b { display: block; font-size: 15px; color: var(--text); }
+  .meta span { display: block; font-size: 13px; color: #6b7487; margin-top: 4px; }
+  .meta code { font-size: 12px; color: var(--primary-text); background: var(--primary-soft); padding: 2px 6px; border-radius: 5px; margin-top: 8px; display: inline-block; }
+  .toggle { margin-top: 12px; display: flex; gap: 8px; }
+  .toggle button { height: 34px; padding: 0 14px; border-radius: 8px; border: 1px solid var(--border-2); background: #fff; font-size: 13.5px; color: #4b5566; }
+  .toggle button.on { background: var(--primary); border-color: var(--primary); color: #fff; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>AI 상담 도우미 — HTML 목업</h1>
+  <p class="desc"><code>docs/design/mockups/</code> 이미지를 HTML/CSS로 재현한 화면 모음입니다. 각 화면은 1586×992 고정 캔버스이며, 타일을 클릭하면 열립니다.</p>
+  <div class="toggle">
+    <button class="on" data-mode="html">HTML 미리보기</button>
+    <button data-mode="png">원본 목업(PNG)</button>
+  </div>
+
+  <h2>일반 사용자 <span class="badge blue">user</span></h2>
+  <div class="grid" id="user"></div>
+
+  <h2>관리자 <span class="badge purple">admin</span></h2>
+  <div class="grid" id="admin"></div>
+</div>
+
+<script>
+  const PAGES = {
+    user: [
+      ['01-home', '홈', '추천 질문, 답변 + 출처 카드, 👍/👎'],
+      ['02-chat', '상담하기', '멀티턴 대화, 관련 문서 패널'],
+      ['03-chat-no-answer-handoff', 'Fail-Closed 응답', '상담원 연결 / 문의 접수 / 정책 보기'],
+      ['04-feedback-negative', '부정 피드백', '부족한 점 선택 + 추가 의견'],
+    ],
+    admin: [
+      ['01-dashboard', '대시보드', '질문 수, 응답률, 미답변률, 피드백'],
+      ['02-knowledge-base-list', '지식베이스', '문서 목록 / 문서 정보 패널'],
+      ['03-document-upload-indexing', '문서 업로드 및 색인', '메타데이터 + 색인 진행 상태'],
+      ['04-search-test', '검색 테스트', 'Rewrite/Multi Query, Vector·BM25·Reranker'],
+      ['05-conversation-logs', '상담 로그', '원본/재작성 쿼리, 검색 문서, 피드백'],
+      ['06-unanswered-analysis', '미답변 분석', 'TOP 10, 추이, 개선 추천'],
+    ],
+  };
+  let mode = 'html';
+  function render() {
+    for (const group of Object.keys(PAGES)) {
+      const el = document.getElementById(group);
+      el.innerHTML = PAGES[group].map(([id, title, sub]) => {
+        const html = `${group}/${id}.html`, png = `../mockups/${group}/${id}.png`;
+        const thumb = mode === 'html'
+          ? `<iframe src="${html}?embed=1" loading="lazy" tabindex="-1"></iframe>`
+          : `<img src="${png}" alt="${title}">`;
+        return `<a class="tile" href="${html}" target="_blank">
+          <div class="thumb">${thumb}</div>
+          <div class="meta"><b>${title}</b><span>${sub}</span><code>${html}</code></div>
+        </a>`;
+      }).join('');
+    }
+    scale();
+  }
+  function scale() {
+    document.querySelectorAll('.thumb iframe').forEach(f => {
+      const w = f.parentElement.clientWidth;
+      f.style.transform = `scale(${w / 1586})`;
+    });
+  }
+  document.querySelectorAll('.toggle button').forEach(b => b.addEventListener('click', () => {
+    mode = b.dataset.mode;
+    document.querySelectorAll('.toggle button').forEach(x => x.classList.toggle('on', x === b));
+    render();
+  }));
+  window.addEventListener('resize', scale);
+  render();
+</script>
+</body>
+</html>

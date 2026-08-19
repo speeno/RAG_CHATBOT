@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI 상담 도우미 — 검색 테스트</title>
+<link rel="stylesheet" href="../shared.css">
+<style>
+  /* 이 목업은 사이드바가 270px, 항목 간격이 약간 촘촘함 */
+  .app { grid-template-columns: 270px 1fr; }
+  .nav { gap: 9px; margin-top: 8px; }
+  .nav-item { padding-left: 24px; }
+  .top-search { left: 296px; width: 547px; }
+  .sidebar-bottom { gap: 20px; }
+
+  .main { padding: 30px 32px 0 30px; }
+  .head { display: flex; align-items: flex-start; justify-content: space-between; }
+  .head .btns { display: flex; gap: 16px; margin-top: 4px; }
+  .head .btn { height: 44px; padding: 0 20px; font-size: 15px; font-weight: 500; color: var(--text); gap: 10px; }
+  .head .btn .ico { width: 18px; height: 18px; color: #4b5566; }
+
+  .row1 { display: grid; grid-template-columns: 1fr 464px; gap: 30px; margin-top: 22px; }
+  .qcard { padding: 20px 20px 22px; height: 140px; }
+  .qcard .lbl { font-size: 14.5px; color: #4b5566; }
+  .qrow { display: flex; align-items: center; gap: 12px; margin-top: 10px; }
+  .qinput { flex: 1; height: 46px; border: 1.5px solid var(--primary); border-radius: 8px; display: flex; align-items: center; padding: 0 16px; font-size: 15.5px; color: var(--text); }
+  .qinput .ico { margin-left: auto; width: 20px; height: 20px; color: #6b7487; }
+  .qbtn { height: 42px; padding: 0 20px; background: var(--primary); color: #fff; border-radius: 8px; font-size: 15px; font-weight: 600; }
+  .qhelp { font-size: 13.5px; color: #8a94a6; margin-top: 12px; }
+
+  .stats { padding: 22px 16px 18px; height: 140px; }
+  .stats .cols { display: grid; grid-template-columns: repeat(3, 1fr); }
+  .stats .col { text-align: center; border-right: 1px solid var(--border); }
+  .stats .col:last-child { border-right: 0; }
+  .stats .col b { display: block; font-size: 15px; font-weight: 700; color: var(--text); }
+  .stats .col .v { display: flex; align-items: center; justify-content: center; gap: 8px; margin-top: 12px; font-size: 15px; color: var(--text); }
+  .stats .col .v .ico { width: 16px; height: 16px; color: var(--green); }
+  .stats .crit { border-top: 1px solid var(--border); margin-top: 16px; padding-top: 12px; text-align: center; font-size: 14px; color: #4b5566; display: flex; justify-content: center; align-items: center; gap: 12px; }
+  .stats .crit .ico { width: 18px; height: 18px; color: #6b7487; }
+
+  .row2 { display: grid; grid-template-columns: 270px minmax(0,1fr) 324px; gap: 12px 12px; margin-top: 20px; align-items: start; }
+  .lcol { display: flex; flex-direction: column; gap: 15px; }
+  .lcard { padding: 11px 14px 12px; }
+  .lcard .t { font-size: 15px; font-weight: 600; color: var(--text); }
+  .lcard .t small { font-weight: 400; color: #4b5566; font-size: 14px; }
+  .gbox { background: #f4f6fa; border-radius: 8px; padding: 10px 14px; font-size: 13.5px; color: var(--text); margin-top: 12px; line-height: 1.5; }
+  .gbox.norm { height: 44px; padding: 10px 14px; margin-top: 10px; }
+  .mq { background: #f4f6fa; border-radius: 8px; padding: 10px 14px 6px; margin-top: 12px; }
+  .mq li { display: flex; gap: 12px; font-size: 13px; color: var(--text); padding: 5.5px 0; white-space: nowrap; }
+  .mq li span:first-child { color: #6b7487; width: 10px; }
+  .mq .more { display: flex; justify-content: flex-end; align-items: center; gap: 4px; font-size: 13px; color: #6b7487; padding: 12px 0 8px; }
+  .mq .more .ico { width: 14px; height: 14px; }
+
+  .ccard { padding: 14px 14px 12px; height: 573px; }
+  .ccard .t { font-size: 15px; font-weight: 600; color: var(--text); }
+  .ccard .t small { font-weight: 400; color: #4b5566; font-size: 14px; }
+  .rt { width: 100%; table-layout: fixed; border-collapse: separate; border-spacing: 0; margin-top: 12px; }
+  .rt col.c1{width:60px} .rt col.c2{width:166px} .rt col.c3{width:90px} .rt col.c4{width:96px} .rt col.c5{width:96px}
+  .rt th { height: 42px; background: #f4f6fa; font-size: 13px; font-weight: 600; color: var(--text); text-align: left; padding: 0 6px; white-space: nowrap; overflow: visible; }
+  .rt th:first-child { border-radius: 8px 0 0 8px; padding-left: 12px; }
+  .rt th:last-child { border-radius: 0 8px 8px 0; text-align: right; }
+  .rt th .ico { width: 14px; height: 14px; vertical-align: -2px; margin-left: 2px; color: #6b7487; }
+  .rt th.num, .rt td.num { text-align: right; }
+  .rt th.num { text-align: left; }
+  .rt th:nth-child(4) { text-align: left; }
+  .rt td { height: 42px; font-size: 13px; color: var(--text); padding: 0 6px; border-bottom: 1px solid #edf0f5; white-space: nowrap; overflow: visible; }
+  .rt tr:last-child td { border-bottom: 1px solid #edf0f5; }
+  .rt td.rd { padding-left: 12px; display: table-cell; }
+  .rt td.rd .in { display: flex; align-items: center; gap: 14px; }
+  .rt td.rd .ico { width: 14px; height: 14px; color: #b3bac8; display: block; }
+  .rt tr.sel td { border-top: 1.5px solid var(--primary); border-bottom: 1.5px solid var(--primary); background: #fff; font-weight: 600; }
+  .rt tr.sel td:first-child { border-left: 1.5px solid var(--primary); border-radius: 6px 0 0 6px; }
+  .rt tr.sel td:last-child { border-right: 1.5px solid var(--primary); border-radius: 0 6px 6px 0; }
+  .rt tr.sel td.rd .ico { color: var(--primary); }
+  .rt td .doc { display: inline-flex; align-items: center; gap: 10px; }
+  .rt td .chip { height: 19px; padding: 0 6px; font-size: 10.5px; border-radius: 4px; background: #eaf0fe; color: var(--primary-text); margin-left: 8px; }
+  .rt td .doc { gap: 0; }
+  .rt td.num { text-align: left; padding-left: 16px; }
+  .rt td.num:last-child { text-align: right; padding-right: 20px; }
+  .rt th:last-child { padding-right: 12px; }
+  .rt th.vs { padding-left: 10px; }
+  .rt th.bm { padding-left: 14px; }
+  .rt th.rr { padding-left: 14px; }
+  .cfoot { display: flex; align-items: center; justify-content: space-between; margin-top: 18px; font-size: 13.5px; color: #4b5566; padding: 0 4px; }
+  .cfoot .dl { display: flex; align-items: center; gap: 8px; }
+  .cfoot .dl .ico { width: 16px; height: 16px; }
+
+  .rcard { padding: 14px 16px 16px; height: 573px; overflow: hidden; }
+  .rcard .rh { display: flex; align-items: center; justify-content: space-between; }
+  .rcard .rh b { font-size: 15.5px; font-weight: 700; color: var(--text); }
+  .rcard .rh .ico { width: 20px; height: 20px; color: #4b5566; }
+  .rcard .lbl { font-size: 12.5px; color: #4b5566; margin-top: 17px; }
+  .rcard .val { font-size: 15.5px; color: var(--text); margin-top: 4px; }
+  .rcard .div { height: 1px; background: var(--border); margin-top: 12px; }
+  .rcard .src { display: flex; align-items: center; gap: 10px; margin-top: 8px; }
+  .rcard .src .doc-ico { width: 20px; height: 20px; }
+  .rcard .src .n { font-size: 13.5px; font-weight: 600; color: var(--text); }
+  .rcard .src .s { font-size: 12px; color: #6b7487; margin-top: 3px; }
+  .rcard .src .d { margin-left: auto; font-size: 12px; color: #6b7487; align-self: flex-end; }
+  .rcard .chunk { background: #f4f6fa; border-radius: 8px; padding: 11px 14px; font-size: 12.5px; color: var(--text); line-height: 1.5; margin-top: 8px; }
+  .rcard .chunk p + p { margin-top: 10px; }
+  .foot { font-size: 13.5px; color: #6b7487; margin-top: 12px; }
+</style>
+<script>
+  window.PAGE = {
+    root: '../',
+    nav: [
+      { icon: 'home', label: '홈' },
+      { icon: 'chat', label: '상담하기' },
+      { icon: 'history', label: '상담 이력' },
+      { icon: 'search', label: '검색 테스트', active: true },
+      { icon: 'help', label: '도움말' },
+    ],
+    user: { name: '김지현', team: '지현팀', avatar: 'assets/avatar-user2.png' },
+  };
+</script>
+</head>
+<body>
+<div class="app">
+  <main class="main">
+    <div class="head">
+      <div>
+        <h1 class="page-title">검색 테스트</h1>
+        <p class="page-sub">사용자 질문에 대한 검색 과정을 테스트하고 검색 성능을 평가할 수 있습니다.</p>
+      </div>
+      <div class="btns">
+        <button class="btn"><i class="ico" data-icon="history"></i> 검색 기록</button>
+        <button class="btn"><i class="ico" data-icon="settings"></i> 설정</button>
+      </div>
+    </div>
+
+    <div class="row1">
+      <section class="card qcard">
+        <div class="lbl">질문 (Query)</div>
+        <div class="qrow">
+          <div class="qinput">환불 기간이 언제인가요? <i class="ico" data-icon="x"></i></div>
+          <button class="qbtn">검색 실행</button>
+        </div>
+        <div class="qhelp">예시: 배송이 얼마나 걸리나요?, 교환은 어떻게 신청하나요?, 멤버십 혜택은 무엇인가요?</div>
+      </section>
+      <section class="card stats">
+        <div class="cols">
+          <div class="col"><b>Top-1 Hit</b><div class="v"><i class="ico" data-icon="check-circle"></i> 1 / 1 (100%)</div></div>
+          <div class="col"><b>Top-3 Hit</b><div class="v"><i class="ico" data-icon="check-circle"></i> 1 / 1 (100%)</div></div>
+          <div class="col"><b>Top-5 Hit</b><div class="v"><i class="ico" data-icon="check-circle"></i> 1 / 1 (100%)</div></div>
+        </div>
+        <div class="crit">평가 기준: 정답 문서 포함 여부 <i class="ico" data-icon="info"></i></div>
+      </section>
+    </div>
+
+    <div class="row2">
+      <div class="lcol">
+        <section class="card lcard">
+          <div class="t">질문 정규화 <small>(Query Normalization)</small></div>
+          <div class="gbox norm">환불 기간이 언제인가요?</div>
+        </section>
+        <section class="card lcard">
+          <div class="t">Rewrite Query</div>
+          <div class="gbox">환불 소요 기간은 얼마나 걸리나요?<br>환불 처리 기간은 어떻게 되나요?<br>환불은 신청 후 며칠 내에 완료되나요?</div>
+        </section>
+        <section class="card lcard" style="height:308px">
+          <div class="t">Multi Query 후보 <small>(자동 생성)</small></div>
+          <ul class="mq">
+            <li><span>1</span><span>환불 기간이 언제인가요?</span></li>
+            <li><span>2</span><span>환불 소요 기간은 얼마나 걸리나요?</span></li>
+            <li><span>3</span><span>환불 처리 기간은 어떻게 되나요?</span></li>
+            <li><span>4</span><span>환불 신청 후 완료까지 며칠 걸리나요?</span></li>
+            <li><span>5</span><span>환불은 며칠 안에 처리되나요?</span></li>
+            <li class="more"><i class="ico" data-icon="plus"></i> 더보기</li>
+          </ul>
+        </section>
+      </div>
+
+      <section class="card ccard">
+        <div class="t">검색 결과 <small>(Retrieved Results)</small></div>
+        <table class="rt">
+          <colgroup><col class="c1"><col class="c2"><col class="c3"><col class="c4"><col class="c5"><col></colgroup>
+          <thead>
+            <tr>
+              <th>순위</th>
+              <th>문서명</th>
+              <th>섹션</th>
+              <th class="vs">Vector Score <i class="ico" data-icon="chevron-down"></i></th>
+              <th class="bm">BM25 Score</th>
+              <th class="rr">Reranker Score</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr class="sel">
+              <td class="rd"><span class="in"><i class="ico" data-icon="radio-on"></i><span>1</span></span></td>
+              <td><span class="doc">환불 및 교환 정책 <span class="chip">정책 문서</span></span></td>
+              <td>3. 환불 정책</td>
+              <td class="num">0.893</td><td class="num">12.45</td><td class="num">0.923</td>
+            </tr>
+            <tr>
+              <td class="rd"><span class="in"><i class="ico" data-icon="radio-off"></i><span>2</span></span></td>
+              <td><span class="doc">배송 정책 및 안내 <span class="chip">정책 문서</span></span></td>
+              <td>5. 반품 및 환불</td>
+              <td class="num">0.812</td><td class="num">9.81</td><td class="num">0.873</td>
+            </tr>
+            <tr>
+              <td class="rd"><span class="in"><i class="ico" data-icon="radio-off"></i><span>3</span></span></td>
+              <td><span class="doc">자주 묻는 질문 (FAQ) <span class="chip">FAQ</span></span></td>
+              <td>환불 관련</td>
+              <td class="num">0.769</td><td class="num">8.23</td><td class="num">0.812</td>
+            </tr>
+            <tr>
+              <td class="rd"><span class="in"><i class="ico" data-icon="radio-off"></i><span>4</span></span></td>
+              <td><span class="doc">멤버십 이용약관 <span class="chip">정책 문서</span></span></td>
+              <td>7. 환불 및 해지</td>
+              <td class="num">0.701</td><td class="num">7.12</td><td class="num">0.762</td>
+            </tr>
+            <tr>
+              <td class="rd"><span class="in"><i class="ico" data-icon="radio-off"></i><span>5</span></span></td>
+              <td><span class="doc">마이페이지 이용 안내 <span class="chip">가이드</span></span></td>
+              <td>2. 주문/환불 조회</td>
+              <td class="num">0.643</td><td class="num">6.38</td><td class="num">0.691</td>
+            </tr>
+            <tr>
+              <td class="rd"><span class="in"><i class="ico" data-icon="radio-off"></i><span>6</span></span></td>
+              <td><span class="doc">청약철회 및 반품 안내 <span class="chip">정책 문서</span></span></td>
+              <td>1. 청약철회</td>
+              <td class="num">0.589</td><td class="num">5.21</td><td class="num">0.612</td>
+            </tr>
+            <tr>
+              <td class="rd"><span class="in"><i class="ico" data-icon="radio-off"></i><span>7</span></span></td>
+              <td><span class="doc">포인트 환불 안내 <span class="chip">정책 문서</span></span></td>
+              <td>4. 포인트 환불</td>
+              <td class="num">0.512</td><td class="num">4.05</td><td class="num">0.523</td>
+            </tr>
+            <tr>
+              <td class="rd"><span class="in"><i class="ico" data-icon="radio-off"></i><span>8</span></span></td>
+              <td><span class="doc">주문 취소 안내 <span class="chip">가이드</span></span></td>
+              <td>3. 주문 취소</td>
+              <td class="num">0.478</td><td class="num">3.76</td><td class="num">0.487</td>
+            </tr>
+            <tr>
+              <td class="rd"><span class="in"><i class="ico" data-icon="radio-off"></i><span>9</span></span></td>
+              <td><span class="doc">결제 수단별 환불 안내 <span class="chip">정책 문서</span></span></td>
+              <td>6. 결제 수단별 환불</td>
+              <td class="num">0.431</td><td class="num">3.12</td><td class="num">0.441</td>
+            </tr>
+            <tr>
+              <td class="rd"><span class="in"><i class="ico" data-icon="radio-off"></i><span>10</span></span></td>
+              <td><span class="doc">이용약관 <span class="chip">정책 문서</span></span></td>
+              <td>12. 기타</td>
+              <td class="num">0.387</td><td class="num">2.34</td><td class="num">0.392</td>
+            </tr>
+          </tbody>
+        </table>
+        <div class="cfoot">
+          <span>총 2,341개 문서 중 10개 표시 (검색 시간: 312ms)</span>
+          <span class="dl"><i class="ico" data-icon="download"></i> 결과 다운로드</span>
+        </div>
+      </section>
+
+      <section class="card rcard">
+        <div class="rh"><b>선택된 청크/컨텍스트 미리보기</b><i class="ico" data-icon="x"></i></div>
+        <div class="lbl">문서명</div>
+        <div class="val">환불 및 교환 정책</div>
+        <div class="lbl">섹션</div>
+        <div class="val">3. 환불 정책</div>
+        <div class="div"></div>
+        <div class="lbl" style="margin-top:12px">출처</div>
+        <div class="src">
+          <i class="ico doc-ico" data-icon="file-fill"></i>
+          <div><div class="n">환불 및 교환 정책.pdf</div><div class="s">정책 문서 &nbsp;•&nbsp; v2.3</div></div>
+          <div class="d">업데이트: 2024. 05. 10.</div>
+        </div>
+        <div class="div" style="margin-top:12px"></div>
+        <div class="lbl" style="margin-top:12px">청크 내용</div>
+        <div class="chunk">
+          <p><b style="font-weight:600">3.2 환불 처리 기간</b><br>환불은 반품 상품이 당사에 도착하여 검수 완료 후 영업일 기준 3~5일 이내에 처리됩니다.</p>
+          <p>· 신용카드: 승인 취소는 카드사 정책에 따라 3~7영업일 소요될 수 있습니다.<br>· 가상계좌/계좌이체: 환불은 입력하신 계좌로 3~5영업일 이내 입금됩니다.<br>· 휴대폰 결제: 결제 취소는 통신사 정책에 따라 3~7영업일 소요될 수 있습니다.</p>
+        </div>
+        <div class="lbl" style="margin-top:14px">문서 내 위치</div>
+        <div class="val" style="font-size:14px">페이지 6 / 24</div>
+      </section>
+    </div>
+
+    <div class="foot">※ 검색 결과는 시스템 설정 및 인덱스 상태에 따라 달라질 수 있습니다.</div>
+  </main>
+</div>
+<script src="../shell.js"></script>
+</body>
+</html>

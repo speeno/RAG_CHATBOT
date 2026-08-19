@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI 상담 도우미 — 상담하기</title>
+<link rel="stylesheet" href="../shared.css">
+<style>
+  .main { padding: 20px 26px 0 38px; display: grid; grid-template-columns: 918px 288px; column-gap: 32px; grid-template-rows: 38px 1fr; }
+  .head { grid-column: 1 / 2; display: flex; align-items: center; justify-content: space-between; }
+  .head h1 { font-size: 22px; font-weight: 700; color: var(--navy); letter-spacing: -0.02em; }
+  .head .btn { height: 37px; padding: 0 16px; font-size: 14.5px; font-weight: 500; color: #4b5566; border-color: #dfe3ea; border-radius: 9px; }
+  .head .btn .ico { width: 18px; height: 18px; }
+
+  .chat-col { grid-column: 1; margin-top: 18px; display: flex; flex-direction: column; }
+  .msgs { display: flex; flex-direction: column; gap: 14px; }
+  .u-row { display: flex; justify-content: flex-end; }
+  .u-row .bubble-user { height: 37px; padding: 0 20px; display: inline-flex; align-items: center; gap: 30px; font-size: 15.5px; border-radius: 10px; }
+  .u-row .meta { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: #6b7487; }
+  .u-row .meta .ck { color: var(--primary); font-size: 14px; letter-spacing: -0.15em; font-weight: 700; }
+  .b-row { display: flex; gap: 18px; align-items: flex-start; }
+  .b-row .bot-avatar { width: 48px; height: 48px; margin-top: 3px; }
+  .b-row .bubble-bot { padding: 8px 22px 10px 22px; line-height: 22.5px; font-size: 15.5px; border-radius: 10px; position: relative; }
+  .b-row .bubble-bot .txt { display: flex; align-items: flex-end; gap: 16px; }
+  .b-row .bubble-bot .txt .time { white-space: nowrap; font-size: 13px; color: #6b7487; padding-bottom: 1px; }
+  .b-row .src { margin-top: 12px; }
+  .src .source-card { padding: 6px 16px 8px; border-radius: 10px; }
+  .src .source-card .sc-label { font-size: 13px; line-height: 1.3; color: #4b5566; margin-bottom: 7px; }
+  .src .source-card .sc-row { gap: 14px; }
+  .src .source-card .sc-title { font-size: 14.5px; font-weight: 600; white-space: nowrap; line-height: 1.3; }
+  .src .source-card .sc-sub { font-size: 12.5px; margin-top: 2px; line-height: 1.3; }
+  .src .doc-ico { width: 24px; height: 24px; }
+  .src .doc-ico .ico { width: 24px; height: 24px; }
+  .src .source-card .sc-date { gap: 26px; font-size: 13px; }
+  .src .source-card .sc-date .ico { width: 20px; height: 20px; }
+  .src2 { display: flex; gap: 8px; }
+  .src2 .source-card:first-child { width: 322px; }
+  .src2 .source-card:last-child { width: 336px; }
+  .src2 .source-card .sc-label { height: 17px; }
+  .src2 .source-card .sc-date { gap: 12px; font-size: 11.5px; white-space: nowrap; }
+  .src2 .source-card .sc-title { font-size: 14px; }
+  .src2 .source-card .sc-sub { font-size: 12px; }
+  .src2 .source-card .sc-date .ico { width: 18px; height: 18px; }
+  .src2 .source-card .sc-row { gap: 12px; }
+
+  .input-wrap { margin-top: 12px; height: 96px; width: 927px; margin-left: -2px; }
+  .input-wrap .ph { left: 16px; top: 15px; font-size: 15.5px; }
+  .input-wrap .clip { left: 26px; bottom: 20px; width: 22px; height: 22px; }
+  .input-wrap .send { top: 13px; right: 17px; height: 45px; padding: 0 22px 0 20px; font-size: 15.5px; }
+  .input-wrap .hint { right: 36px; bottom: 8px; }
+  .note { margin-top: 14px; }
+
+  .side { grid-column: 2; grid-row: 1 / 3; margin-top: 52px; display: flex; flex-direction: column; gap: 15px; }
+  .side .card { padding: 18px 18px 18px; }
+  .side-head { display: flex; align-items: center; justify-content: space-between; height: 30px; margin-bottom: 26px; }
+  .side-head b { font-size: 16.5px; font-weight: 700; color: var(--navy); }
+  .side-head span { font-size: 13.5px; color: #6b7487; display: flex; align-items: center; gap: 7px; }
+  .side-head span .ico { width: 17px; height: 17px; }
+  .docs { display: flex; flex-direction: column; gap: 4px; }
+  .doc-item { border: 1px solid var(--border); border-radius: 10px; height: 108px; padding: 14px 14px 12px 14px; display: flex; gap: 12px; position: relative; }
+  .doc-item .doc-ico { margin-top: 3px; }
+  .doc-item .t { font-size: 14.5px; font-weight: 600; color: var(--text); }
+  .doc-item .s { font-size: 13.5px; color: #6b7487; margin-top: 5px; }
+  .doc-item .d { font-size: 13px; color: #6b7487; margin-top: 12px; }
+  .doc-item .ext { position: absolute; right: 16px; bottom: 26px; width: 20px; height: 20px; color: #4b5566; }
+  .qs { display: flex; flex-direction: column; gap: 9px; margin-top: -8px; }
+  .q-item { border: 1px solid var(--border); border-radius: 10px; height: 47px; display: flex; align-items: center; padding: 0 16px; font-size: 14.5px; color: var(--text); }
+</style>
+<script>
+  window.PAGE = {
+    root: '../',
+    nav: [
+      { icon: 'home', label: '홈' },
+      { icon: 'chat', label: '상담하기', active: true },
+      { icon: 'history', label: '상담 이력' },
+      { icon: 'help', label: '도움말' },
+    ],
+    user: { name: '김지현', team: '지원팀', avatar: 'assets/avatar-user2.png' },
+  };
+</script>
+</head>
+<body>
+<div class="app">
+  <main class="main">
+    <div class="head">
+      <h1>상담하기</h1>
+      <button class="btn"><i class="ico" data-icon="edit-doc"></i> 새 상담</button>
+    </div>
+
+    <div class="chat-col">
+      <div class="msgs">
+        <div class="u-row"><div class="bubble-user">주문한 상품의 배송 상태를 확인하고 싶어요. <span class="meta">오전 10:21 <span class="ck">✓✓</span></span></div></div>
+
+        <div class="b-row">
+          <img class="bot-avatar" src="../assets/avatar-bot.png" alt="">
+          <div class="bubble-bot" style="width:697px">
+            <div class="txt"><div>네, 배송 상태를 확인해드릴게요. 주문번호를 알려주시면 정확하게 조회해드릴 수 있어요.<br>주문내역이 확인되면 현재 배송 단계와 예상 도착일을 안내해드리겠습니다.</div><span class="time">오전 10:21</span></div>
+          </div>
+        </div>
+
+        <div class="u-row"><div class="bubble-user">20240510-12345 입니다. <span class="meta">오전 10:22 <span class="ck">✓✓</span></span></div></div>
+
+        <div class="b-row">
+          <img class="bot-avatar" src="../assets/avatar-bot.png" alt="">
+          <div class="bubble-bot" style="width:634px">
+            <div class="txt"><div>확인해보니, 주문하신 상품은 현재 '배송 중' 상태입니다.<br>CJ대한통운을 통해 배송 중이며, 예상 도착일은 2024년 5월 14일(화)입니다.<br>운송장 번호는 1234-5678-9012 입니다.</div><span class="time">오전 10:22</span></div>
+            <div class="src">
+              <div class="source-card">
+                <div class="sc-label">출처</div>
+                <div class="sc-row">
+                  <div class="doc-ico"><i class="ico" data-icon="file-fill"></i></div>
+                  <div><div class="sc-title">배송 정책 및 배송 조회 가이드</div><div class="sc-sub">3. 배송 상태 안내</div></div>
+                  <div class="sc-date"><span>업데이트: 2024. 04. 25.</span><i class="ico" data-icon="external"></i></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="u-row"><div class="bubble-user">배송이 늦어져서 환불받고 싶어요. 환불 가능한가요? <span class="meta">오전 10:25 <span class="ck">✓✓</span></span></div></div>
+
+        <div class="b-row">
+          <img class="bot-avatar" src="../assets/avatar-bot.png" alt="">
+          <div class="bubble-bot" style="width:700px">
+            <div class="txt"><div>네, 배송 지연으로 인한 환불은 가능합니다.<br>예상 도착일로부터 3영업일 이상 지연될 경우, 고객님께서 요청하시면 환불이 가능해요.<br>환불은 결제 수단으로 3~5영업일 내에 진행됩니다.</div><span class="time">오전 10:25</span></div>
+            <div class="src src2">
+              <div class="source-card">
+                <div class="sc-label">출처 (2)</div>
+                <div class="sc-row">
+                  <div class="doc-ico"><i class="ico" data-icon="file-fill"></i></div>
+                  <div><div class="sc-title">환불 및 교환 정책</div><div class="sc-sub">2. 환불 기준</div></div>
+                  <div class="sc-date"><span>업데이트: 2024. 05. 10.</span><i class="ico" data-icon="external"></i></div>
+                </div>
+              </div>
+              <div class="source-card">
+                <div class="sc-label"></div>
+                <div class="sc-row">
+                  <div class="doc-ico"><i class="ico" data-icon="file-fill"></i></div>
+                  <div><div class="sc-title">주문 취소 및 환불 가이드</div><div class="sc-sub">4. 환불 처리 기간</div></div>
+                  <div class="sc-date"><span>업데이트: 2024. 04. 18.</span><i class="ico" data-icon="external"></i></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="u-row"><div class="bubble-user">알겠어요. 환불 요청은 어떻게 하나요? <span class="meta">오전 10:26 <span class="ck">✓✓</span></span></div></div>
+      </div>
+
+      <div class="chat-input input-wrap">
+        <span class="ph">궁금한 내용을 입력해 주세요...</span>
+        <i class="ico clip" data-icon="paperclip"></i>
+        <button class="send"><i class="ico" data-icon="send"></i> 전송</button>
+        <span class="hint">Enter로 전송 &nbsp;/&nbsp; Shift + Enter로 줄바꿈</span>
+      </div>
+      <div class="chat-note note"><i class="ico" data-icon="info"></i> AI 상담 도우미는 내부 문서를 기반으로 답변하며, 부정확한 정보가 있다면 피드백을 남겨주세요.</div>
+    </div>
+
+    <aside class="side">
+      <div class="card">
+        <div class="side-head"><b>관련 문서</b><span>모두 보기</span></div>
+        <div class="docs">
+          <div class="doc-item"><div class="doc-ico"><i class="ico" data-icon="file-fill"></i></div><div><div class="t">배송 정책 및 배송 조회 가이드</div><div class="s">3. 배송 상태 안내</div><div class="d">업데이트: 2024. 04. 25.</div></div><i class="ico ext" data-icon="external"></i></div>
+          <div class="doc-item"><div class="doc-ico"><i class="ico" data-icon="file-fill"></i></div><div><div class="t">환불 및 교환 정책</div><div class="s">2. 환불 기준</div><div class="d">업데이트: 2024. 05. 10.</div></div><i class="ico ext" data-icon="external"></i></div>
+          <div class="doc-item"><div class="doc-ico"><i class="ico" data-icon="file-fill"></i></div><div><div class="t">주문 취소 및 환불 가이드</div><div class="s">4. 환불 처리 기간</div><div class="d">업데이트: 2024. 04. 18.</div></div><i class="ico ext" data-icon="external"></i></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="side-head"><b>추천 질문</b><span><i class="ico" data-icon="refresh"></i> 새로고침</span></div>
+        <div class="qs">
+          <div class="q-item">배송 조회는 어떻게 하나요?</div>
+          <div class="q-item">교환은 어떤 조건에서 가능한가요?</div>
+          <div class="q-item">환불 처리 기간은 얼마나 걸리나요?</div>
+          <div class="q-item">주문 취소는 언제까지 가능한가요?</div>
+        </div>
+      </div>
+    </aside>
+  </main>
+</div>
+<script src="../shell.js"></script>
+</body>
+</html>

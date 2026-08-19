@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI 상담 도우미 — 지식베이스</title>
+<link rel="stylesheet" href="../shared.css">
+<style>
+  .main { padding: 0; }
+  .left { position: absolute; left: 36px; top: 30px; width: 929px; }
+  .head { display: flex; align-items: flex-start; justify-content: space-between; }
+  .head .btns { display: flex; gap: 12px; margin-top: 4px; }
+  .head .btn { height: 44px; padding: 0 20px 0 18px; font-size: 15px; font-weight: 500; color: #4b5566; border-color: #dfe3ea; }
+  .head .btn .ico { width: 20px; height: 20px; color: var(--primary); }
+  .head .btn.sq { width: 43px; padding: 0; }
+  .head .btn.sq .ico { color: #4b5566; }
+
+  .tabs { display: flex; align-items: center; gap: 9px; margin-top: 30px; }
+  .tab {
+    height: 35px; padding: 0 14px; border: 1px solid #dfe3ea; border-radius: 8px; background: #fff;
+    display: flex; align-items: center; gap: 8px; font-size: 14.5px; color: #4b5566;
+  }
+  .tab.active { background: var(--primary-soft); border-color: #cfdaf9; color: var(--primary-text); font-weight: 600; }
+  .tab .n { font-size: 13.5px; }
+  .tabs .sep { width: 1px; height: 22px; background: #dfe3ea; margin: 0 8px 0 7px; }
+
+  .filters { display: flex; gap: 16px; margin-top: 27px; }
+  .filters .search { width: 318px; height: 48px; border: 1px solid #dfe3ea; border-radius: 10px; background: #fff; display: flex; align-items: center; gap: 12px; padding: 0 16px; font-size: 14.5px; color: #98a1b3; }
+  .filters .search .ico { width: 20px; height: 20px; color: #6b7487; }
+  .filters .select { height: 48px; }
+  .filters .s1 { width: 204px; }
+  .filters .s2 { width: 224px; }
+  .filters .reset { margin-left: auto; height: 48px; padding: 0 16px; font-size: 14px; font-weight: 500; color: #4b5566; border-color: #dfe3ea; }
+  .filters .reset .ico { width: 18px; height: 18px; }
+
+  .tbl { margin-top: 17px; border-radius: 12px; overflow: hidden; }
+  .tbl table { width: 100%; border-collapse: collapse; }
+  .tbl th { height: 55px; background: #f5f6f9; font-size: 14px; font-weight: 500; color: #4b5566; text-align: left; padding: 0; }
+  .tbl td { height: 65px; padding: 0; font-size: 15px; color: var(--text); border-top: 1px solid #edf0f5; }
+  .tbl tr.short td { height: 57px; }
+  .tbl tr.sel td { background: #f8faff; }
+    .tbl tr.sel { outline: 1.5px solid var(--primary); outline-offset: -1.5px; }
+  .tbl .c-chk { width: 66px; padding-left: 14px !important; }
+  .tbl .c-name { width: 200px; }
+  .tbl .c-cat { width: 123px; }
+  .tbl .c-ver { width: 76px; }
+  .tbl .c-st { width: 80px; }
+  .tbl .c-date { width: 136px; }
+  .tbl .c-own { width: 140px; }
+  .tbl .c-act { }
+  .tbl th .th-in { display: flex; align-items: center; gap: 8px; }
+  .tbl th .th-in .ico { width: 16px; height: 16px; color: #4b5566; }
+  .name-cell { display: flex; align-items: center; gap: 12px; }
+  .name-cell .ico { width: 24px; height: 24px; color: var(--primary); }
+  .name-cell .ico.gray { color: #a3abba; }
+  .name-cell span { font-weight: 500; }
+  .chk { width: 20px; height: 20px; border: 1.5px solid #cdd3de; border-radius: 5px; background: #fff; display: block; }
+  .chk.on { background: var(--primary); border-color: var(--primary); }
+  .chk.on svg { width: 100%; height: 100%; }
+  .owner { display: flex; align-items: center; gap: 10px; }
+  .owner img { width: 28px; height: 28px; border-radius: 50%; object-fit: cover; }
+  .acts { display: flex; align-items: center; gap: 20px; }
+  .acts .ico { width: 18px; height: 18px; color: #4b5566; }
+  .st { height: 26px; padding: 0 9px; border-radius: 6px; font-size: 13px; font-weight: 500; display: inline-flex; align-items: center; }
+  .st.on { background: #d5f5e8; color: #0f9f7a; }
+  .st.off { background: #eceff4; color: #6b7487; }
+  .ver { color: #4b5566; }
+  .date { color: #4b5566; }
+  .cat { color: #4b5566; }
+
+  .pager { display: flex; align-items: center; height: 60px; padding: 0 14px; border-top: 1px solid #edf0f5; font-size: 14px; color: #4b5566; }
+  .pager .pages { margin-left: auto; margin-right: auto; display: flex; align-items: center; gap: 4px; }
+  .pager .pg { width: 34px; height: 34px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 14.5px; color: #4b5566; }
+  .pager .pg.cur { background: var(--primary-soft); color: var(--primary-text); font-weight: 600; }
+  .pager .pg .ico { width: 16px; height: 16px; }
+  .pager .pg.dis { color: #b5bccb; }
+  .pager .select { width: 108px; height: 40px; }
+
+  .rp { position: absolute; left: 1001px; top: 12px; width: 288px; height: 874px; border-radius: 16px; padding: 22px 20px 0; }
+  .rp-head { display: flex; align-items: center; justify-content: space-between; }
+  .rp-head b { font-size: 20px; font-weight: 700; color: var(--navy); }
+  .rp-head .ico { width: 24px; height: 24px; color: #4b5566; }
+  .rp-doc { display: flex; align-items: flex-start; gap: 22px; margin-top: 30px; padding-left: 4px; }
+  .rp-doc .ico { width: 40px; height: 40px; color: var(--primary); }
+  .rp-doc .t { font-size: 20px; font-weight: 700; color: var(--navy); }
+  .rp-doc .st { margin-top: 8px; }
+  .rp-meta { font-size: 14.5px; color: #4b5566; margin-top: 22px; }
+  .rp-meta .bar { color: #cdd3de; margin: 0 10px; }
+  .rp-tabs { display: flex; gap: 0; margin-top: 26px; border-bottom: 1px solid #e6e9f0; margin-left: -20px; margin-right: -20px; padding: 0 20px; }
+  .rp-tabs span { padding: 0 8px 12px; font-size: 15px; color: #4b5566; margin-right: 22px; }
+  .rp-tabs span.on { color: var(--primary-text); font-weight: 600; border-bottom: 2px solid var(--primary); margin-bottom: -1px; }
+  .fld { margin-top: 20px; }
+  .fld .l { font-size: 13.5px; color: #6b7487; }
+  .fld .v { font-size: 15px; color: var(--text); margin-top: 5px; line-height: 1.5; }
+  .fld .chips { display: flex; gap: 8px; margin-top: 10px; }
+  .fld .chip { height: 26px; padding: 0 10px; border-radius: 6px; background: #eef1f6; font-size: 13.5px; color: #4b5566; }
+  .fld .owner { margin-top: 8px; }
+  .fld .owner img { width: 30px; height: 30px; }
+  .rp .preview { position: absolute; left: 20px; right: 20px; bottom: 42px; height: 46px; border: 1px solid #dfe3ea; border-radius: 10px; display: flex; align-items: center; justify-content: center; gap: 10px; font-size: 15px; font-weight: 600; color: var(--primary-text); background: #fff; }
+  .rp .preview .ico { width: 20px; height: 20px; }
+</style>
+<script>
+  window.PAGE = {
+    root: '../',
+    search: '문서명, 카테고리, 키워드 검색 (예: 환불 정책)',
+    nav: [
+      { icon: 'home', label: '홈' },
+      { icon: 'chat', label: '상담하기' },
+      { icon: 'history', label: '상담 이력' },
+      { icon: 'book-open', label: '지식베이스', active: true },
+      { icon: 'bar-chart', label: '통계' },
+      { icon: 'settings', label: '설정' },
+      { icon: 'help', label: '도움말' },
+    ],
+    user: { name: '김지원', team: '지원팀', avatar: 'assets/avatar-user.png' },
+  };
+</script>
+</head>
+<body>
+<div class="app">
+  <main class="main">
+    <div class="left">
+      <div class="head">
+        <div>
+          <div class="page-title">지식베이스</div>
+          <div class="page-sub">AI 상담 도우미가 답변에 참고하는 문서를 관리하세요.</div>
+        </div>
+        <div class="btns">
+          <button class="btn"><i class="ico" data-icon="upload"></i> 문서 업로드</button>
+          <button class="btn"><i class="ico" data-icon="folder"></i> 새 폴더</button>
+          <button class="btn sq"><i class="ico" data-icon="more-v"></i></button>
+        </div>
+      </div>
+
+      <div class="tabs">
+        <div class="tab active">전체 <span class="n">48</span></div>
+        <div class="tab">문서 <span class="n">42</span></div>
+        <div class="tab">폴더 <span class="n">6</span></div>
+        <div class="sep"></div>
+        <div class="tab">활성 <span class="n">38</span></div>
+        <div class="tab">비활성 <span class="n">10</span></div>
+      </div>
+
+      <div class="filters">
+        <div class="search"><i class="ico" data-icon="search"></i> 문서명 검색</div>
+        <div class="select s1"><span>카테고리 전체</span><i class="ico" data-icon="chevron-down"></i></div>
+        <div class="select s2"><span>상태 전체</span><i class="ico" data-icon="chevron-down"></i></div>
+        <button class="btn reset"><i class="ico" data-icon="sliders"></i> 필터 초기화</button>
+      </div>
+
+      <div class="card tbl">
+        <table>
+          <thead>
+            <tr>
+              <th class="c-chk"><span class="chk"></span></th>
+              <th class="c-name">문서명</th>
+              <th class="c-cat">카테고리</th>
+              <th class="c-ver">버전</th>
+              <th class="c-st">상태</th>
+              <th class="c-date"><div class="th-in">업데이트일 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px"><path d="M12 5v14M6 13l6 6 6-6"/></svg></div></th>
+              <th class="c-own">소유자</th>
+              <th class="c-act">작업</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr class="sel">
+              <td class="c-chk"><span class="chk on"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M6 12.5l4 4 8-9"/></svg></span></td>
+              <td class="c-name"><div class="name-cell"><i class="ico" data-icon="file-fill"></i><span>환불 정책</span></div></td>
+              <td class="c-cat cat">정책 및 안내</td>
+              <td class="c-ver ver">v2.3</td>
+              <td class="c-st"><span class="st on">활성</span></td>
+              <td class="c-date date">2024.05.10</td>
+              <td class="c-own"><div class="owner"><img src="../assets/avatar-kim.png" alt="">김지원</div></td>
+              <td class="c-act"><div class="acts"><i class="ico" data-icon="eye"></i><i class="ico" data-icon="edit"></i><i class="ico" data-icon="more-v"></i></div></td>
+            </tr>
+            <tr>
+              <td class="c-chk"><span class="chk"></span></td>
+              <td class="c-name"><div class="name-cell"><i class="ico" data-icon="file-fill"></i><span>배송 정책</span></div></td>
+              <td class="cat">배송/교환/반품</td>
+              <td class="ver">v1.8</td>
+              <td><span class="st on">활성</span></td>
+              <td class="date">2024.05.08</td>
+              <td><div class="owner"><img src="../assets/avatar-lee.png" alt="">이상민</div></td>
+              <td><div class="acts"><i class="ico" data-icon="eye"></i><i class="ico" data-icon="edit"></i><i class="ico" data-icon="more-v"></i></div></td>
+            </tr>
+            <tr>
+              <td class="c-chk"><span class="chk"></span></td>
+              <td class="c-name"><div class="name-cell"><i class="ico" data-icon="file-fill"></i><span>요금제 안내</span></div></td>
+              <td class="cat">요금제</td>
+              <td class="ver">v3.1</td>
+              <td><span class="st on">활성</span></td>
+              <td class="date">2024.05.07</td>
+              <td><div class="owner"><img src="../assets/avatar-kim.png" alt="">김지원</div></td>
+              <td><div class="acts"><i class="ico" data-icon="eye"></i><i class="ico" data-icon="edit"></i><i class="ico" data-icon="more-v"></i></div></td>
+            </tr>
+            <tr>
+              <td class="c-chk"><span class="chk"></span></td>
+              <td class="c-name"><div class="name-cell"><i class="ico" data-icon="file-fill"></i><span>개인정보처리방침</span></div></td>
+              <td class="cat">정책 및 안내</td>
+              <td class="ver">v1.2</td>
+              <td><span class="st on">활성</span></td>
+              <td class="date">2024.05.01</td>
+              <td><div class="owner"><img src="../assets/avatar-lee.png" alt="">이상민</div></td>
+              <td><div class="acts"><i class="ico" data-icon="eye"></i><i class="ico" data-icon="edit"></i><i class="ico" data-icon="more-v"></i></div></td>
+            </tr>
+            <tr>
+              <td class="c-chk"><span class="chk"></span></td>
+              <td class="c-name"><div class="name-cell"><i class="ico" data-icon="file-fill"></i><span>이용약관</span></div></td>
+              <td class="cat">정책 및 안내</td>
+              <td class="ver">v2.0</td>
+              <td><span class="st on">활성</span></td>
+              <td class="date">2024.04.28</td>
+              <td><div class="owner"><img src="../assets/avatar-kim.png" alt="">김지원</div></td>
+              <td><div class="acts"><i class="ico" data-icon="eye"></i><i class="ico" data-icon="edit"></i><i class="ico" data-icon="more-v"></i></div></td>
+            </tr>
+            <tr class="short">
+              <td class="c-chk"><span class="chk"></span></td>
+              <td class="c-name"><div class="name-cell"><i class="ico gray" data-icon="file-fill"></i><span>교환/반품 안내</span></div></td>
+              <td class="cat">배송/교환/반품</td>
+              <td class="ver">v1.5</td>
+              <td><span class="st off">비활성</span></td>
+              <td class="date">2024.04.20</td>
+              <td><div class="owner"><img src="../assets/avatar-park.png" alt="">박준호</div></td>
+              <td><div class="acts"><i class="ico" data-icon="eye"></i><i class="ico" data-icon="edit"></i><i class="ico" data-icon="more-v"></i></div></td>
+            </tr>
+            <tr class="short">
+              <td class="c-chk"><span class="chk"></span></td>
+              <td class="c-name"><div class="name-cell"><i class="ico gray" data-icon="file-fill"></i><span>포인트 정책</span></div></td>
+              <td class="cat">멤버십/포인트</td>
+              <td class="ver">v1.0</td>
+              <td><span class="st off">비활성</span></td>
+              <td class="date">2024.04.15</td>
+              <td><div class="owner"><img src="../assets/avatar-lee.png" alt="">이상민</div></td>
+              <td><div class="acts"><i class="ico" data-icon="eye"></i><i class="ico" data-icon="edit"></i><i class="ico" data-icon="more-v"></i></div></td>
+            </tr>
+            <tr class="short">
+              <td class="c-chk"><span class="chk"></span></td>
+              <td class="c-name"><div class="name-cell"><i class="ico gray" data-icon="folder"></i><span>프로모션 안내</span></div></td>
+              <td class="cat">프로모션</td>
+              <td class="ver">-</td>
+              <td><span class="st on">활성</span></td>
+              <td class="date">2024.04.10</td>
+              <td><div class="owner"><img src="../assets/avatar-kim.png" alt="">김지원</div></td>
+              <td><div class="acts"><i class="ico" data-icon="eye"></i><i class="ico" data-icon="edit"></i><i class="ico" data-icon="more-v"></i></div></td>
+            </tr>
+          </tbody>
+        </table>
+        <div class="pager">
+          <span>전체 48개 중 1-8 표시</span>
+          <div class="pages">
+            <span class="pg dis"><i class="ico" data-icon="chevron-left"></i></span>
+            <span class="pg cur">1</span><span class="pg">2</span><span class="pg">3</span><span class="pg">4</span><span class="pg">5</span>
+            <span class="pg">···</span><span class="pg">6</span>
+            <span class="pg"><i class="ico" data-icon="chevron-right"></i></span>
+          </div>
+          <div class="select"><span>10개씩</span><i class="ico" data-icon="chevron-down"></i></div>
+        </div>
+      </div>
+    </div>
+
+    <aside class="card rp">
+      <div class="rp-head"><b>문서 정보</b><i class="ico" data-icon="x"></i></div>
+      <div class="rp-doc">
+        <i class="ico" data-icon="file-fill"></i>
+        <div>
+          <div class="t">환불 정책</div>
+          <span class="st on">활성</span>
+        </div>
+      </div>
+      <div class="rp-meta">정책 및 안내<span class="bar">|</span>v2.3</div>
+      <div class="rp-tabs"><span class="on">개요</span><span>버전 이력</span></div>
+
+      <div class="fld"><div class="l">문서 설명</div><div class="v">고객 환불 절차 및 기준에 대한 정책 문서입니다.</div></div>
+      <div class="fld"><div class="l">주요 키워드</div><div class="chips"><span class="chip">환불</span><span class="chip">취소</span><span class="chip">결제</span><span class="chip">정책</span></div></div>
+      <div class="fld"><div class="l">업데이트일</div><div class="v">2024.05.10 10:30</div></div>
+      <div class="fld"><div class="l">소유자</div><div class="owner"><img src="../assets/avatar-kim.png" alt="">김지원 (지원팀)</div></div>
+      <div class="fld"><div class="l">생성일</div><div class="v">2024.02.15 09:20</div></div>
+      <div class="fld"><div class="l">파일 이름</div><div class="v">refund_policy_v2.3.md</div></div>
+      <div class="fld"><div class="l">파일 크기</div><div class="v">24.6 KB</div></div>
+
+      <div class="preview"><i class="ico" data-icon="eye"></i> 미리보기</div>
+    </aside>
+  </main>
+</div>
+<script src="../shell.js"></script>
+</body>
+</html>

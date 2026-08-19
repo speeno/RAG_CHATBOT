@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI 상담 도우미 — 대시보드</title>
+<link rel="stylesheet" href="../shared.css">
+<style>
+  .main { padding: 30px 46px 0 37px; }
+  .head { display: flex; align-items: flex-start; justify-content: space-between; height: 86px; }
+  .head .page-title { font-size: 27px; }
+  .head .page-sub { margin-top: 10px; }
+  .head-right { display: flex; align-items: center; gap: 15px; margin-top: 7px; }
+  .date-range {
+    height: 44px; padding: 0 16px 0 18px; border: 1px solid #dfe3ea; border-radius: 10px; background: #fff;
+    display: flex; align-items: center; gap: 22px; font-size: 15px; font-weight: 600; color: var(--text);
+  }
+  .date-range .ico { width: 20px; height: 20px; color: #4b5566; }
+  .filter-btn { height: 44px; padding: 0 16px; border: 1px solid #dfe3ea; border-radius: 10px; background: #fff; display: flex; align-items: center; gap: 10px; font-size: 15px; font-weight: 600; color: var(--text); }
+  .filter-btn .ico { width: 20px; height: 20px; color: #4b5566; }
+
+  /* KPI */
+  .kpis { display: grid; grid-template-columns: 245px 240px 230px 226px 217px; gap: 15px; margin-top: 6px; }
+  .kpi { height: 125px; border-radius: 14px; padding: 20px 20px 0 18px; display: flex; gap: 16px; }
+  .kpi .kico { width: 46px; height: 46px; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex: none; }
+  .kpi .kico .ico { width: 24px; height: 24px; }
+  .kpi .kico.blue { background: #e2ebfe; color: var(--primary); }
+  .kpi .kico.green { background: #d9f6ea; color: var(--green); }
+  .kpi .kico.orange { background: #fff0dc; color: var(--orange); }
+  .kpi .lbl { font-size: 14px; color: #4b5566; margin-top: 2px; }
+  .kpi .val { font-size: 27px; font-weight: 800; color: var(--navy); margin-top: 3px; letter-spacing: -0.02em; }
+  .kpi .val small { font-size: 18px; font-weight: 700; margin-left: 2px; }
+  .kpi .trend { font-size: 13px; color: #98a1b3; margin-top: 8px; display: flex; align-items: center; gap: 8px; }
+  .kpi .trend b { font-weight: 700; display: inline-flex; align-items: center; gap: 4px; }
+  .kpi .trend .up { color: var(--green); }
+  .kpi .trend .down { color: var(--red); }
+  .kpi .trend .tri { display: inline-block; width: 0; height: 0; border-left: 4.5px solid transparent; border-right: 4.5px solid transparent; }
+  .kpi .trend .up .tri { border-bottom: 7px solid var(--green); }
+  .kpi .trend .down .tri { border-top: 7px solid var(--red); }
+
+  /* rows */
+  .row2 { display: grid; grid-template-columns: 599px 604px; gap: 16px; margin-top: 19px; }
+  .row3 { display: grid; grid-template-columns: 541px 662px; gap: 16px; margin-top: 18px; }
+  .panel { border-radius: 14px; padding: 22px 22px 0; position: relative; }
+  .panel-head { display: flex; align-items: center; justify-content: space-between; height: 24px; }
+  .panel-head h3 { font-size: 17px; font-weight: 700; color: var(--navy); }
+  .panel-head .link { font-size: 13.5px; color: #6b7487; }
+  .panel-head .dd { height: 32px; padding: 0 12px 0 14px; border: 1px solid #dfe3ea; border-radius: 8px; display: flex; align-items: center; gap: 12px; font-size: 13.5px; color: #4b5566; }
+  .panel-head .dd .ico { width: 16px; height: 16px; }
+  .row2 .panel { height: 303px; }
+  .row3 .panel { height: 272px; }
+
+  /* line chart */
+  .line-chart { position: relative; margin-top: 12px; height: 240px; }
+  .line-chart svg { position: absolute; left: 0; top: 0; }
+  .line-chart .ylab { position: absolute; font-size: 12.5px; color: #6b7487; right: 0; }
+  .line-chart .xlab { position: absolute; font-size: 12.5px; color: #6b7487; transform: translateX(-50%); }
+  .tooltip { position: absolute; left: 481px; top: 22px; width: 82px; height: 58px; background: #fff; border: 1px solid #e3e7ef; border-radius: 8px; box-shadow: 0 4px 12px rgba(20,30,60,.08); padding: 8px 12px; }
+  .tooltip .d { font-size: 12px; color: #6b7487; }
+  .tooltip .v { font-size: 15px; font-weight: 800; color: var(--navy); margin-top: 3px; }
+
+  /* bars */
+  .bars { margin-top: 30px; }
+  .bar-row { display: flex; align-items: center; height: 36px; }
+  .bar-row .bl { width: 82px; font-size: 14px; color: #4b5566; }
+  .bar-row .bar { height: 22px; border-radius: 3px; }
+  .bar-row .bv { font-size: 14px; color: var(--navy); font-weight: 600; margin-left: 12px; }
+  .bar-row .bv span { color: #6b7487; font-weight: 400; margin-left: 4px; }
+  .bar-axis { position: relative; margin-left: 82px; margin-top: 12px; height: 16px; font-size: 12.5px; color: #6b7487; }
+  .bar-axis span { position: absolute; transform: translateX(-50%); }
+
+  /* donut */
+  .donut-wrap { display: flex; align-items: center; margin-top: 18px; }
+  .donut { position: relative; width: 174px; height: 174px; margin-left: 15px; }
+  .donut .c { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+  .donut .c small { font-size: 12.5px; color: #6b7487; }
+  .donut .c b { font-size: 20px; font-weight: 800; color: var(--navy); margin-top: 3px; }
+  .legend { margin-left: 56px; width: 226px; }
+  .legend .lg { display: flex; align-items: center; height: 49px; font-size: 14.5px; color: var(--text); border-bottom: 1px solid #edf0f5; }
+  .legend .lg:last-child { border-bottom: 0; }
+  .legend .dot { width: 9px; height: 9px; margin-right: 12px; }
+  .legend .lv { margin-left: auto; color: #4b5566; font-size: 14.5px; }
+  .legend .lv b { color: var(--text); font-weight: 600; }
+
+  /* issues table */
+  .issues { width: 100%; border-collapse: collapse; margin-top: 16px; }
+  .issues th { font-size: 13.5px; font-weight: 500; color: #6b7487; text-align: left; height: 30px; padding: 0 0 0 4px; border-bottom: 1px solid #edf0f5; }
+  .issues td { font-size: 14px; color: var(--text); height: 33.5px; padding: 0 0 0 4px; border-bottom: 1px solid #f0f2f6; }
+  .issues tr:last-child td { border-bottom: 0; }
+  .issues .c1 { width: 58px; }
+  .issues .c2 { width: 270px; }
+  .issues .c3 { width: 120px; }
+  .issues .c4 { width: 95px; }
+  .issues td.c3, .issues td.c4, .issues td.c5 { color: #4b5566; }
+</style>
+<script>
+  window.PAGE = {
+    root: '../',
+    nav: [
+      { icon: 'home', label: '대시보드', active: true },
+      { icon: 'book-open', label: '지식베이스' },
+      { icon: 'search', label: '검색 테스트' },
+      { icon: 'user-log', label: '상담 로그' },
+      { icon: 'line-chart', label: '미답변 분석' },
+      { icon: 'settings', label: '설정' },
+    ],
+    user: { name: '김지원', team: '관리자', avatar: 'assets/avatar-user.png' },
+  };
+</script>
+</head>
+<body>
+<div class="app">
+  <main class="main">
+    <div class="head">
+      <div>
+        <div class="page-title">대시보드</div>
+        <div class="page-sub">AI 상담 도우미의 운영 현황을 한눈에 확인하세요.</div>
+      </div>
+      <div class="head-right">
+        <div class="date-range">2024. 05. 04 ~ 2024. 05. 10 <i class="ico" data-icon="calendar"></i></div>
+        <div class="filter-btn"><i class="ico" data-icon="filter"></i> 필터</div>
+      </div>
+    </div>
+
+    <div class="kpis">
+      <div class="card kpi">
+        <div class="kico blue"><i class="ico" data-icon="chat-fill-2"></i></div>
+        <div><div class="lbl">일일 질문 수</div><div class="val">2,458</div>
+          <div class="trend"><b class="up"><span class="tri"></span>12.5%</b> vs 지난 7일</div></div>
+      </div>
+      <div class="card kpi">
+        <div class="kico green"><i class="ico" data-icon="check-circle"></i></div>
+        <div><div class="lbl">응답률</div><div class="val">95.3%</div>
+          <div class="trend"><b class="up"><span class="tri"></span>3.2%</b> vs 지난 7일</div></div>
+      </div>
+      <div class="card kpi">
+        <div class="kico orange"><i class="ico" data-icon="help"></i></div>
+        <div><div class="lbl">미답변률</div><div class="val">4.7%</div>
+          <div class="trend"><b class="down"><span class="tri"></span>1.8%</b> vs 지난 7일</div></div>
+      </div>
+      <div class="card kpi">
+        <div class="kico green"><i class="ico" data-icon="thumbs-up"></i></div>
+        <div><div class="lbl">긍정 피드백</div><div class="val">92.1%</div>
+          <div class="trend"><b class="up"><span class="tri"></span>4.6%</b> vs 지난 7일</div></div>
+      </div>
+      <div class="card kpi">
+        <div class="kico blue"><i class="ico" data-icon="history"></i></div>
+        <div><div class="lbl">평균 응답 시간</div><div class="val">5.3<small>초</small></div>
+          <div class="trend"><b class="down"><span class="tri"></span>1.2초</b> vs 지난 7일</div></div>
+      </div>
+    </div>
+
+    <div class="row2">
+      <section class="card panel">
+        <div class="panel-head"><h3>일별 질문 수 추이</h3><div class="dd">일별 <i class="ico" data-icon="chevron-down"></i></div></div>
+        <div class="line-chart">
+          <span class="ylab" style="top:12px;right:512px">4K</span>
+          <span class="ylab" style="top:58px;right:512px">3K</span>
+          <span class="ylab" style="top:104px;right:512px">2K</span>
+          <span class="ylab" style="top:150px;right:512px">1K</span>
+          <span class="ylab" style="top:196px;right:512px">0</span>
+          <svg width="555" height="240" viewBox="0 0 555 240">
+            <defs>
+              <linearGradient id="g1" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0" stop-color="#2b5efd" stop-opacity=".16"/>
+                <stop offset="1" stop-color="#2b5efd" stop-opacity="0"/>
+              </linearGradient>
+            </defs>
+            <g stroke="#e9ecf2" stroke-dasharray="3 3">
+              <line x1="42" y1="19" x2="540" y2="19"/><line x1="42" y1="65" x2="540" y2="65"/>
+              <line x1="42" y1="111" x2="540" y2="111"/><line x1="42" y1="157" x2="540" y2="157"/>
+            </g>
+            <line x1="42" y1="203" x2="540" y2="203" stroke="#dfe3ea"/>
+            <path d="M45,111 L120,134 L196,111 L295,101 L374,122 L452,94 L525,101 L525,203 L45,203 Z" fill="url(#g1)"/>
+            <polyline points="45,111 120,134 196,111 295,101 374,122 452,94 525,101" fill="none" stroke="#2b5efd" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round"/>
+            <g fill="#2b5efd" stroke="#fff" stroke-width="2">
+              <circle cx="45" cy="111" r="4.5"/><circle cx="120" cy="134" r="4.5"/><circle cx="196" cy="111" r="4.5"/>
+              <circle cx="295" cy="101" r="4.5"/><circle cx="374" cy="122" r="4.5"/><circle cx="452" cy="94" r="4.5"/>
+            </g>
+            <circle cx="525" cy="101" r="8" fill="#fff" stroke="#2b5efd" stroke-width="2"/>
+            <circle cx="525" cy="101" r="4" fill="#2b5efd"/>
+          </svg>
+          <div class="tooltip"><div class="d">05.10</div><div class="v">2,458건</div></div>
+          <span class="xlab" style="left:45px;top:214px">05.04</span>
+          <span class="xlab" style="left:120px;top:214px">05.05</span>
+          <span class="xlab" style="left:196px;top:214px">05.06</span>
+          <span class="xlab" style="left:295px;top:214px">05.07</span>
+          <span class="xlab" style="left:374px;top:214px">05.08</span>
+          <span class="xlab" style="left:452px;top:214px">05.09</span>
+          <span class="xlab" style="left:525px;top:214px">05.10</span>
+        </div>
+      </section>
+
+      <section class="card panel">
+        <div class="panel-head"><h3>질문 카테고리 TOP 5</h3><span class="link">전체 보기</span></div>
+        <div class="bars">
+          <div class="bar-row"><span class="bl">주문/배송</span><div class="bar" style="width:348px;background:#2a59eb"></div><span class="bv">1,024<span>(41.7%)</span></span></div>
+          <div class="bar-row"><span class="bl">환불/교환</span><div class="bar" style="width:191px;background:#4a72f0"></div><span class="bv">612<span>(24.9%)</span></span></div>
+          <div class="bar-row"><span class="bl">상품 문의</span><div class="bar" style="width:139px;background:#5f84f3"></div><span class="bv">458<span>(18.7%)</span></span></div>
+          <div class="bar-row"><span class="bl">결제 관련</span><div class="bar" style="width:71px;background:#7597f7"></div><span class="bv">214<span>(8.7%)</span></span></div>
+          <div class="bar-row"><span class="bl">회원/계정</span><div class="bar" style="width:50px;background:#87a6fa"></div><span class="bv">150<span>(6.0%)</span></span></div>
+        </div>
+        <div class="bar-axis"><span style="left:0">0</span><span style="left:150px">500</span><span style="left:308px">1K</span><span style="left:463px">1.5K</span></div>
+      </section>
+    </div>
+
+    <div class="row3">
+      <section class="card panel">
+        <div class="panel-head"><h3>피드백 비율</h3><span class="link">전체 보기</span></div>
+        <div class="donut-wrap">
+          <div class="donut">
+            <svg width="174" height="174" viewBox="0 0 174 174">
+              <g transform="rotate(-90 87 87)">
+                <circle cx="87" cy="87" r="70" fill="none" stroke="#cacfda" stroke-width="30"/>
+                <circle cx="87" cy="87" r="70" fill="none" stroke="#fe961a" stroke-width="30" stroke-dasharray="428.8 439.8" stroke-dashoffset="0"/>
+                <circle cx="87" cy="87" r="70" fill="none" stroke="#10b38c" stroke-width="30" stroke-dasharray="405.1 439.8" stroke-dashoffset="0"/>
+              </g>
+              <circle cx="87" cy="87" r="55" fill="#fff"/>
+            </svg>
+            <div class="c"><small>전체 피드백</small><b>1,892건</b></div>
+          </div>
+          <div class="legend">
+            <div class="lg"><span class="dot" style="background:#10b38c"></span>긍정<span class="lv"><b>1,742건</b> (92.1%)</span></div>
+            <div class="lg"><span class="dot" style="background:#fe961a"></span>부정<span class="lv"><b>102건</b> (5.4%)</span></div>
+            <div class="lg"><span class="dot" style="background:#cacfda"></span>중립<span class="lv"><b>48건</b> (2.5%)</span></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="card panel">
+        <div class="panel-head"><h3>최근 주요 이슈 <span style="font-weight:500;color:#4b5566;font-size:15px">(상위 질문)</span></h3><span class="link">전체 보기</span></div>
+        <table class="issues">
+          <thead><tr><th class="c1">순위</th><th class="c2">질문</th><th class="c3">카테고리</th><th class="c4">질문 수</th><th class="c5">미답변률</th></tr></thead>
+          <tbody>
+            <tr><td class="c1">1</td><td class="c2">주문 취소는 어떻게 하나요?</td><td class="c3">주문/배송</td><td class="c4">245</td><td class="c5">2.4%</td></tr>
+            <tr><td class="c1">2</td><td class="c2">환불은 언제 처리되나요?</td><td class="c3">환불/교환</td><td class="c4">198</td><td class="c5">3.1%</td></tr>
+            <tr><td class="c1">3</td><td class="c2">배송 조회가 되지 않아요.</td><td class="c3">주문/배송</td><td class="c4">173</td><td class="c5">1.7%</td></tr>
+            <tr><td class="c1">4</td><td class="c2">교환 신청은 어떻게 하나요?</td><td class="c3">환불/교환</td><td class="c4">121</td><td class="c5">4.1%</td></tr>
+            <tr><td class="c1">5</td><td class="c2">결제 오류가 발생했어요.</td><td class="c3">결제 관련</td><td class="c4">98</td><td class="c5">2.0%</td></tr>
+          </tbody>
+        </table>
+      </section>
+    </div>
+  </main>
+</div>
+<script src="../shell.js"></script>
+</body>
+</html>

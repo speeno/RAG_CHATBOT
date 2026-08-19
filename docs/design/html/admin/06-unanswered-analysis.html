@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI 상담 도우미 — 미답변 분석</title>
+<link rel="stylesheet" href="../shared.css">
+<style>
+  .main { padding: 30px 32px 0 23px; }
+  .head { display: flex; align-items: flex-start; justify-content: space-between; height: 84px; }
+  .head h1 { font-size: 26px; font-weight: 800; color: var(--navy); letter-spacing: -0.02em; line-height: 1.2; }
+  .head p { font-size: 14.5px; color: #6b7487; margin-top: 8px; }
+  .head-r { display: flex; gap: 16px; margin-top: 4px; }
+  .date-box { height: 42px; padding: 0 16px 0 18px; border: 1px solid #dfe3ea; border-radius: 10px; background: #fff; display: flex; align-items: center; gap: 22px; font-size: 15px; color: var(--text); }
+  .date-box .ico { width: 20px; height: 20px; color: #4b5566; }
+  .head-r .btn { height: 42px; padding: 0 18px; font-size: 15px; font-weight: 500; color: var(--text); }
+  .head-r .btn .ico { width: 20px; height: 20px; }
+
+  .kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+  .kpi { height: 127px; border-radius: 14px; padding: 26px 22px 0 24px; display: flex; gap: 18px; }
+  .kpi .kic { width: 66px; height: 66px; border-radius: 14px; display: flex; align-items: center; justify-content: center; flex: none; }
+  .kpi .kic .ico { width: 34px; height: 34px; }
+  .kpi .kic.blue { background: #e4ecff; color: var(--primary); }
+  .kpi .kic.sky { background: #e2f1fc; color: #2f9be8; }
+  .kpi .kic.purple { background: #efe9ff; color: #7c5cf5; }
+  .kpi .kic.green { background: #dcf5ea; color: #10b38c; }
+  .kpi .kl { font-size: 14px; color: #4b5566; display: flex; align-items: center; gap: 6px; }
+  .kpi .kl .ico { width: 15px; height: 15px; color: #a3abba; }
+  .kpi .kv { font-size: 30px; font-weight: 800; color: var(--navy); letter-spacing: -0.02em; margin-top: 4px; line-height: 1.15; }
+  .kpi .kv small { font-size: 18px; font-weight: 700; margin-left: 2px; }
+  .kpi .ks { font-size: 12.5px; color: #8a94a6; margin-top: 6px; display: flex; gap: 8px; }
+  .kpi .ks b { font-weight: 600; }
+
+  .grid3 { display: grid; grid-template-columns: 525px 375px 317px; column-gap: 15px; margin-top: 17px; height: 554px; }
+  .card { border-radius: 14px; }
+  .c-head { display: flex; align-items: center; justify-content: space-between; height: 22px; }
+  .mid .c-head { margin-top: 4px; }
+  .c-head h2 { font-size: 16.5px; font-weight: 700; color: var(--navy); display: flex; align-items: center; gap: 8px; }
+  .c-head h2 .ico { width: 15px; height: 15px; color: #a3abba; }
+  .c-head .more { font-size: 13.5px; color: #4b5566; height: 32px; padding: 0 12px; border: 1px solid #dfe3ea; border-radius: 8px; display: flex; align-items: center; background: #fff; }
+  .c-head .sel { height: 30px; padding: 0 10px 0 12px; border: 1px solid #dfe3ea; border-radius: 8px; display: flex; align-items: center; gap: 12px; font-size: 13.5px; color: #4b5566; background: #fff; }
+  .c-head .sel .ico { width: 15px; height: 15px; }
+
+  /* 좌측: TOP 10 */
+  .left { padding: 26px 16px 0 16px; }
+  .top10 { width: 100%; border-collapse: collapse; margin-top: 26px; table-layout: fixed; }
+  .top10 th { height: 32px; background: #f5f6f9; font-size: 12.5px; font-weight: 500; color: #4b5566; text-align: left; padding: 0 6px; white-space: nowrap; }
+  .top10 th:first-child { padding-left: 14px; }
+  .top10 td { height: 39px; font-size: 13px; color: var(--text); padding: 0 6px; border-top: 1px solid #edf0f5; white-space: nowrap; }
+  .top10 tr:first-child td { border-top: 0; }
+  .top10 td:first-child { padding-left: 14px; color: #4b5566; }
+  .top10 td.q { color: var(--primary); }
+  .top10 .num { text-align: left; }
+  .top10 .up { color: #f0442f; font-weight: 500; }
+  .top10 .dn { color: #10b38c; font-weight: 500; }
+  .left .foot { font-size: 12.5px; color: #8a94a6; margin-top: 22px; padding-left: 4px; }
+
+  /* 중앙 */
+  .mid { display: flex; flex-direction: column; gap: 16px; }
+  .mid .card { padding: 18px 18px 0 18px; }
+  .trend { height: 282px; }
+  .trend svg { display: block; width: 100%; height: 190px; margin-top: 12px; }
+  .legend { display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 12.5px; color: #4b5566; margin-top: 4px; }
+  .legend i { width: 20px; height: 2px; background: var(--chart-blue); position: relative; }
+  .legend i::after { content: ''; position: absolute; left: 6px; top: -3px; width: 8px; height: 8px; border-radius: 50%; background: var(--chart-blue); }
+  .dist { height: 256px; }
+  .dist-body { display: flex; align-items: center; margin-top: 8px; gap: 12px; }
+  .dist-body svg { width: 148px; height: 148px; flex: none; }
+  .dl { display: flex; flex-direction: column; gap: 9px; flex: 1; }
+  .dl div { display: flex; align-items: center; font-size: 12.5px; color: var(--text); }
+  .dl .dot { width: 9px; height: 9px; margin-right: 8px; }
+  .dl .n { margin-left: auto; color: #4b5566; }
+  .dl .n b { font-weight: 600; color: var(--text); margin-right: 3px; }
+
+  /* 우측: 개선 추천 */
+  .right { padding: 26px 16px 0 16px; }
+  .right .c-head h2 .ico { width: 20px; height: 20px; color: var(--primary); }
+  .recs { display: flex; flex-direction: column; margin-top: 38px; }
+  .rec { border-top: 1px solid #edf0f5; padding: 21px 0; }
+  .rec:first-child { border-top: 0; padding-top: 0; }
+  .rec:last-child { padding-bottom: 0; }
+  .rec .r-top { display: flex; align-items: flex-start; gap: 12px; }
+  .rec .r-ic { width: 46px; height: 46px; border-radius: 12px; display: flex; align-items: center; justify-content: center; flex: none; }
+  .rec .r-ic .ico { width: 24px; height: 24px; }
+  .rec .r-ic.blue { background: #e4ecff; color: var(--primary); }
+  .rec .r-ic.purple { background: #efe9ff; color: #7c5cf5; }
+  .rec .r-ic.green { background: #dcf5ea; color: #10b38c; }
+  .rec .r-title { font-size: 15px; font-weight: 700; color: var(--text); line-height: 20px; }
+  .rec .r-desc { font-size: 12.5px; color: #6b7487; line-height: 16px; margin-top: 6px; }
+  .rec .r-bot { display: flex; align-items: center; margin-top: 14px; padding-left: 58px; }
+  .rec .r-bot .badge { height: 26px; padding: 0 12px; border-radius: 7px; font-size: 13px; color: #fff; }
+  .rec .r-bot .badge.b { background: var(--primary); }
+  .rec .r-bot .badge.p { background: #7c5cf5; }
+  .rec .r-bot .badge.g { background: #10b38c; }
+  .rec .r-bot .btn { margin-left: auto; height: 32px; padding: 0 12px; font-size: 13.5px; font-weight: 500; color: #4b5566; margin-right: 6px; }
+  .right .all { margin-top: 34px; height: 36px; border: 1px solid #dfe3ea; border-radius: 8px; background: #fff; display: flex; align-items: center; justify-content: space-between; padding: 0 12px 0 0; font-size: 13.5px; color: #4b5566; }
+  .right .all span { flex: 1; text-align: center; }
+  .right .all .ico { width: 16px; height: 16px; }
+
+  .footer { display: flex; align-items: center; justify-content: space-between; margin-top: 30px; font-size: 13px; color: #6b7487; padding: 0 4px; }
+  .footer .l { display: flex; align-items: center; gap: 8px; }
+  .footer .l .ico { width: 16px; height: 16px; }
+  .footer .r { display: flex; align-items: center; gap: 10px; }
+  .footer .r .ico { width: 16px; height: 16px; color: var(--primary); }
+</style>
+<script>
+  window.PAGE = {
+    root: '../',
+    nav: [
+      { icon: 'home', label: '홈' },
+      { icon: 'chat', label: '상담하기' },
+      { icon: 'history', label: '상담 이력' },
+      { icon: 'line-chart', label: '미답변 분석', active: true },
+      { icon: 'help', label: '도움말' },
+    ],
+    user: { name: '김지원', team: '지틴팀', avatar: 'assets/avatar-user.png' },
+  };
+</script>
+</head>
+<body>
+<div class="app">
+  <main class="main">
+    <div class="head">
+      <div>
+        <h1>미답변 분석</h1>
+        <p>답변하지 못한 질문을 분석하고 개선하여 상담 품질을 높여보세요.</p>
+      </div>
+      <div class="head-r">
+        <div class="date-box"><span>2024.05.04 ~ 2024.05.10</span><i class="ico" data-icon="calendar"></i></div>
+        <button class="btn"><i class="ico" data-icon="filter"></i> 필터</button>
+      </div>
+    </div>
+
+    <div class="kpis">
+      <div class="card kpi"><div class="kic blue"><i class="ico" data-icon="message-q"></i></div><div><div class="kl">미답변 건수 <i class="ico" data-icon="info"></i></div><div class="kv">1,248<small>건</small></div><div class="ks">지난 7일 대비 <b class="trend-down">▲ 12.5%</b></div></div></div>
+      <div class="card kpi"><div class="kic sky"><i class="ico" data-icon="pie-chart"></i></div><div><div class="kl">미답변 비율 <i class="ico" data-icon="info"></i></div><div class="kv">8.7%</div><div class="ks">전체 상담 대비 <b class="trend-up">▼ 1.2%p</b></div></div></div>
+      <div class="card kpi"><div class="kic purple"><i class="ico" data-icon="trending-up"></i></div><div><div class="kl">최근 증가율 <i class="ico" data-icon="info"></i></div><div class="kv">+12.5%</div><div class="ks">지난 7일 대비 <b class="trend-down">▲ 12.5%</b></div></div></div>
+      <div class="card kpi"><div class="kic green"><i class="ico" data-icon="check-circle"></i></div><div><div class="kl">처리 완료율 <i class="ico" data-icon="info"></i></div><div class="kv">72.3%</div><div class="ks">미답변 중 처리 완료 <b class="trend-up">▲ 5.4%p</b></div></div></div>
+    </div>
+
+    <div class="grid3">
+      <!-- 좌측 -->
+      <section class="card left">
+        <div class="c-head"><h2>답변하지 못한 질문 TOP 10 <i class="ico" data-icon="info"></i></h2><span class="more">전체 보기</span></div>
+        <table class="top10">
+          <thead><tr><th style="width:40px">순위</th><th>질문</th><th style="width:74px">미답변 건수</th><th style="width:74px">미답변 비율</th><th style="width:74px">최근 증가율</th></tr></thead>
+          <tbody>
+            <tr><td>1</td><td class="q">해외배송 기간은 얼마나 걸리나요?</td><td>132</td><td>12.4%</td><td class="up">▲ 28.6%</td></tr>
+            <tr><td>2</td><td class="q">VIP 등급 혜택과 할인율은 어떻게 되나요?</td><td>98</td><td>9.1%</td><td class="up">▲ 15.3%</td></tr>
+            <tr><td>3</td><td class="q">법인 고객 환불 절차는 어떻게 되나요?</td><td>87</td><td>8.2%</td><td class="up">▲ 32.1%</td></tr>
+            <tr><td>4</td><td class="q">대량 주문 시 추가 할인 여부가 궁금해요.</td><td>75</td><td>7.0%</td><td class="dn">▼ 4.8%</td></tr>
+            <tr><td>5</td><td class="q">교환 신청은 어떻게 하나요?</td><td>64</td><td>6.0%</td><td class="up">▲ 8.5%</td></tr>
+            <tr><td>6</td><td class="q">선물 포장 옵션이 있나요?</td><td>52</td><td>4.9%</td><td class="up">▲ 3.7%</td></tr>
+            <tr><td>7</td><td class="q">비회원 주문 조회는 어떻게 하나요?</td><td>43</td><td>4.0%</td><td class="dn">▼ 1.2%</td></tr>
+            <tr><td>8</td><td class="q">해외 배송비는 어떻게 계산되나요?</td><td>39</td><td>3.7%</td><td class="up">▲ 22.2%</td></tr>
+            <tr><td>9</td><td class="q">개인정보는 어떻게 관리되나요?</td><td>31</td><td>2.9%</td><td class="dn">▼ 6.1%</td></tr>
+            <tr><td>10</td><td class="q">영수증 발급은 어떻게 받나요?</td><td>28</td><td>2.6%</td><td class="dn">▼ 3.4%</td></tr>
+          </tbody>
+        </table>
+        <div class="foot">기준: 미답변 건수</div>
+      </section>
+
+      <!-- 중앙 -->
+      <div class="mid">
+        <section class="card trend">
+          <div class="c-head"><h2>미답변 추이 <i class="ico" data-icon="info"></i></h2><span class="sel">일별 <i class="ico" data-icon="chevron-down"></i></span></div>
+          <svg viewBox="0 0 340 190" font-family="inherit">
+            <!-- y axis -->
+            <g font-size="10.5" fill="#8a94a6" text-anchor="end">
+              <text x="26" y="14">400</text><text x="26" y="52">300</text><text x="26" y="90">200</text><text x="26" y="128">100</text><text x="26" y="166">0</text>
+            </g>
+            <g stroke="#eef0f4" stroke-width="1"><line x1="34" y1="10" x2="330" y2="10"/><line x1="34" y1="48" x2="330" y2="48"/><line x1="34" y1="86" x2="330" y2="86"/><line x1="34" y1="124" x2="330" y2="124"/><line x1="34" y1="162" x2="330" y2="162"/></g>
+            <!-- values 220,198,215,236,242,230,248 ; scale: y = 162 - v*0.38 -->
+            <defs><linearGradient id="g6" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2b5efd" stop-opacity=".22"/><stop offset="1" stop-color="#2b5efd" stop-opacity="0"/></linearGradient></defs>
+            <path d="M46 78.4 L92 86.8 L138 80.3 L184 72.3 L230 70 L276 74.6 L322 67.8 L322 162 L46 162 Z" fill="url(#g6)"/>
+            <polyline points="46,78.4 92,86.8 138,80.3 184,72.3 230,70 276,74.6 322,67.8" fill="none" stroke="#2b5efd" stroke-width="2"/>
+            <g fill="#fff" stroke="#2b5efd" stroke-width="2"><circle cx="46" cy="78.4" r="3.5"/><circle cx="92" cy="86.8" r="3.5"/><circle cx="138" cy="80.3" r="3.5"/><circle cx="184" cy="72.3" r="3.5"/><circle cx="230" cy="70" r="3.5"/><circle cx="276" cy="74.6" r="3.5"/><circle cx="322" cy="67.8" r="3.5"/></g>
+            <g font-size="10.5" fill="#4b5566" text-anchor="middle"><text x="46" y="70">220</text><text x="92" y="79">198</text><text x="138" y="72">215</text><text x="184" y="64">236</text><text x="230" y="62">242</text><text x="276" y="66">230</text><text x="322" y="59">248</text></g>
+            <g font-size="10.5" fill="#8a94a6" text-anchor="middle"><text x="46" y="184">05/04</text><text x="92" y="184">05/05</text><text x="138" y="184">05/06</text><text x="184" y="184">05/07</text><text x="230" y="184">05/08</text><text x="276" y="184">05/09</text><text x="322" y="184" fill="#2b5efd" font-weight="700">05/10</text></g>
+          </svg>
+          <div class="legend"><i></i> 미답변 건수</div>
+        </section>
+
+        <section class="card dist">
+          <div class="c-head"><h2>미답변 카테고리 분포 <i class="ico" data-icon="info"></i></h2><span class="sel">전체 <i class="ico" data-icon="chevron-down"></i></span></div>
+          <div class="dist-body">
+            <svg viewBox="0 0 100 100">
+              <!-- 33.0 / 23.9 / 17.2 / 11.5 / 7.7 / 6.7 ; circumference r=38 -> 238.76 -->
+              <g fill="none" stroke-width="16" transform="rotate(-90 50 50)">
+                <circle cx="50" cy="50" r="38" stroke="#2b5efd" stroke-dasharray="78.8 238.76" stroke-dashoffset="0"/>
+                <circle cx="50" cy="50" r="38" stroke="#fe961a" stroke-dasharray="57.1 238.76" stroke-dashoffset="-78.8"/>
+                <circle cx="50" cy="50" r="38" stroke="#20c4c8" stroke-dasharray="41.1 238.76" stroke-dashoffset="-135.9"/>
+                <circle cx="50" cy="50" r="38" stroke="#f5c542" stroke-dasharray="27.4 238.76" stroke-dashoffset="-177"/>
+                <circle cx="50" cy="50" r="38" stroke="#7fd6cf" stroke-dasharray="18.4 238.76" stroke-dashoffset="-204.4"/>
+                <circle cx="50" cy="50" r="38" stroke="#cacfda" stroke-dasharray="16 238.76" stroke-dashoffset="-222.8"/>
+              </g>
+              <text x="50" y="47" text-anchor="middle" font-size="7.5" fill="#8a94a6">합계</text>
+              <text x="50" y="60" text-anchor="middle" font-size="10.5" font-weight="800" fill="#1b2b4b">1,248건</text>
+            </svg>
+            <div class="dl">
+              <div><span class="dot" style="background:#2b5efd"></span>배송/물류<span class="n"><b>412건</b>(33.0%)</span></div>
+              <div><span class="dot" style="background:#fe961a"></span>할인/혜택<span class="n"><b>298건</b>(23.9%)</span></div>
+              <div><span class="dot" style="background:#20c4c8"></span>환불/교환<span class="n"><b>215건</b>(17.2%)</span></div>
+              <div><span class="dot" style="background:#f5c542"></span>주문/결제<span class="n"><b>143건</b>(11.5%)</span></div>
+              <div><span class="dot" style="background:#7fd6cf"></span>회원/계정<span class="n"><b>96건</b>(7.7%)</span></div>
+              <div><span class="dot" style="background:#cacfda"></span>기타<span class="n"><b>84건</b>(6.7%)</span></div>
+            </div>
+          </div>
+        </section>
+      </div>
+
+      <!-- 우측 -->
+      <section class="card right">
+        <div class="c-head"><h2><i class="ico" data-icon="sparkles"></i> 개선 추천</h2></div>
+        <div class="recs">
+          <div class="rec">
+            <div class="r-top"><span class="r-ic blue"><i class="ico" data-icon="file-text"></i></span><div><div class="r-title">새 문서 추가</div><div class="r-desc">새로운 질문 유형에 대한 문서를<br>추가하여 답변 가능 범위를 넓혀요.</div></div></div>
+            <div class="r-bot"><span class="badge b">28건</span><button class="btn">확인하기</button></div>
+          </div>
+          <div class="rec">
+            <div class="r-top"><span class="r-ic purple"><i class="ico" data-icon="edit"></i></span><div><div class="r-title">기존 문서 보완</div><div class="r-desc">미답변이 많은 질문의 문서를<br>보완하여 정확도를 높여요.</div></div></div>
+            <div class="r-bot"><span class="badge p">15건</span><button class="btn">확인하기</button></div>
+          </div>
+          <div class="rec">
+            <div class="r-top"><span class="r-ic green"><i class="ico" data-icon="headphones"></i></span><div><div class="r-title">상담원 FAQ 생성</div><div class="r-desc">반복되는 미답변 질문을 상담원용<br>FAQ로 만들어 제공해요.</div></div></div>
+            <div class="r-bot"><span class="badge g">12건</span><button class="btn">확인하기</button></div>
+          </div>
+        </div>
+        <div class="all"><span>개선 내역 보기</span><i class="ico" data-icon="chevron-right"></i></div>
+      </section>
+    </div>
+
+    <div class="footer">
+      <div class="l"><i class="ico" data-icon="shield-check"></i> 미답변 분석은 최근 90일간의 데이터를 기반으로 제공됩니다.</div>
+      <div class="r">데이터 업데이트: 2024.05.10 10:30 <i class="ico" data-icon="refresh"></i></div>
+    </div>
+  </main>
+</div>
+<script src="../shell.js"></script>
+</body>
+</html>
