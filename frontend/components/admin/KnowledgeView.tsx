@@ -174,7 +174,14 @@ function UploadForm({ onUploaded }: { onUploaded: () => void }) {
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<{ kind: "ok" | "err"; text: string } | null>(null);
   const [meta, setMeta] = useState({ title: "", document_id: "", category: "", version: "", effective_date: "" });
+  const [suggest, setSuggest] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  // 미답변 분석 → "새 문서 추가/기존 문서 보완"으로 넘어온 경우(?suggest=질문) 안내 표시
+  useEffect(() => {
+    const q = new URLSearchParams(window.location.search).get("suggest");
+    if (q) setSuggest(q);
+  }, []);
 
   const pick = (f: File | null) => {
     setFile(f);
@@ -227,6 +234,11 @@ function UploadForm({ onUploaded }: { onUploaded: () => void }) {
         <div><label className="field-label">버전</label><input className="input" value={meta.version} onChange={(e) => setMeta({ ...meta, version: e.target.value })} placeholder="1.0" /></div>
         <div><label className="field-label">시행일</label><input className="input" type="date" value={meta.effective_date} onChange={(e) => setMeta({ ...meta, effective_date: e.target.value })} /></div>
       </div>
+      {suggest && (
+        <div className="alert warn" style={{ marginTop: 12, fontSize: 13 }}>
+          <Icon name="help" /> <span>미답변 질문 <b>“{suggest}”</b>에 답할 수 있는 문서를 추가하거나, 관련 문서를 보완해 재색인하세요.</span>
+        </div>
+      )}
       {msg && <div className={`alert ${msg.kind === "ok" ? "warn" : "error"}`} style={{ marginTop: 12, ...(msg.kind === "ok" ? { background: "var(--green-bg)", color: "#0f6f55", borderColor: "#bfead9" } : {}) }}><Icon name={msg.kind === "ok" ? "check-circle" : "alert-circle"} /> {msg.text}</div>}
       <div className="f-btns">
         <button className="btn primary" disabled={!file || busy} onClick={submit}>

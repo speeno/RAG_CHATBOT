@@ -140,3 +140,74 @@ def test_logs_filters_paging_export_and_detail(seeded):
     assert csv_res.status_code == 200 and "text/csv" in csv_res.headers["content-type"]
     lines = csv_res.text.lstrip("﻿").splitlines()
     assert lines[0].startswith("created_at,conversation_id,message_id,user_query") and len(lines) == 2
+
+
+def test_stats_overview_and_unanswered(seeded):
+    a = seeded.post("/api/chat", json={"message": "환불은 며칠 이내에 신청해야 하나요?"}).json()
+    seeded.post("/api/chat", json={"message": "환불은 며칠 이내에 신청해야 하나요?", "conversation_id": a["conversation_id"]})
+    seeded.post("/api/chat", json={"message": "양자역학 슈뢰딩거 방정식 유도"})
+    seeded.post("/api/chat", json={"message": "양자역학 슈뢰딩거 방정식 유도!"})  # 같은 질문(정규화 동일)
+    seeded.post("/api/feedback", json={"message_id": a["message_id"], "rating": "positive"})
+
+    ov = seeded.get("/api/stats/overview").json()
+    k = ov["kpi"]
+    assert k["questions"] == 4 and k["answered"] == 2 and k["unanswered"] == 2
+    assert k["answer_rate"] == 50.0 and k["no_answer_rate"] == 50.0 and k["positive_rate"] == 100.0
+    assert k["conversations"] == 3 and ov["feedback"] == {"positive": 1, "negative": 0, "none": 3, "total": 4}
+    assert len(ov["daily"]) == 7 and sum(d["questions"] for d in ov["daily"]) == 4
+    assert ov["top_questions"][0]["count"] == 2 and ov["categories"] and ov["range"]["days"] == 7
+    assert "delta" in ov and "kpi_prev" in ov
+
+    un = seeded.get("/api/stats/unanswered").json()
+    assert un["kpi"]["unanswered"] == 2 and un["kpi"]["rate"] == 50.0 and un["kpi"]["distinct"] == 1
+    top = un["top"][0]
+    assert top["count"] == 2 and top["status"] == "open" and top["recommendation"] in ("new_document", "improve_document")
+    # 처리 상태 변경 → 처리 완료율 반영
+    r = seeded.patch(f"/api/stats/unanswered/{top['key']}", json={"status": "resolved", "note": "문서 추가함"})
+    assert r.status_code == 200
+    un2 = seeded.get("/api/stats/unanswered").json()
+    assert un2["top"][0]["status"] == "resolved" and un2["kpi"]["resolved_rate"] == 100.0
+    assert seeded.get("/api/stats/overview", params={"date_from": "2020-13-40"}).status_code == 422
+
+
+def test_inquiries_crud(seeded):
+    r = seeded.post("/api/inquiries", json={"content": "법인 고객 환불 절차가 궁금합니다", "contact": "a@b.c", "kind": "inquiry"})
+    assert r.status_code == 201
+    iid = r.json()["id"]
+    lst = seeded.get("/api/inquiries").json()
+    assert lst and lst[0]["id"] == iid and lst[0]["status"] == "open"
+    assert seeded.patch(f"/api/inquiries/{iid}", json={"status": "done"}).status_code == 200
+    assert seeded.get("/api/inquiries", params={"status": "open"}).json() == []
+    assert seeded.patch("/api/inquiries/nope", json={"status": "done"}).status_code == 404
+    assert seeded.post("/api/inquiries", json={"content": ""}).status_code == 422
+
+
+def test_admin_token_gate(tmp_path, monkeypatch):
+    monkeypatch.setenv("DATABASE_PATH", str(tmp_path / "auth.db"))
+    monkeypatch.setenv("LLM_PROVIDER", "extractive")
+    monkeypatch.setenv("EMBEDDING_PROVIDER", "hash")
+    monkeypatch.setenv("ADMIN_TOKEN", "s3cret-token")
+    from app.core.config import get_settings
+    get_settings.cache_clear()
+    from fastapi.testclient import TestClient
+    from app.main import create_app
+    with TestClient(create_app()) as c:
+        assert c.get("/api/health").json()["admin_auth"] is True
+        # 공개 엔드포인트는 토큰 없이 동작
+        assert c.post("/api/chat", json={"message": "안녕"}).status_code == 200
+        assert c.post("/api/inquiries", json={"content": "문의"}).status_code == 201
+        # 관리자 엔드포인트는 401
+        for path in ["/api/knowledge", "/api/logs", "/api/stats/overview", "/api/inquiries", "/api/admin/me"]:
+            assert c.get(path).status_code == 401, path
+        assert c.post("/api/search/test", json={"query": "x"}).status_code == 401
+        assert c.get("/api/admin/me", headers={"Authorization": "Bearer wrong"}).status_code == 401
+        # 올바른 토큰(Bearer 또는 X-Admin-Token)
+        assert c.get("/api/admin/me", headers={"Authorization": "Bearer s3cret-token"}).json()["ok"] is True
+        assert c.get("/api/knowledge", headers={"X-Admin-Token": "s3cret-token"}).status_code == 200
+        assert c.get("/api/stats/overview", headers={"Authorization": "Bearer s3cret-token"}).status_code == 200
+    get_settings.cache_clear()
+
+
+def test_admin_open_when_token_unset(client):
+    assert client.get("/api/health").json()["admin_auth"] is False
+    assert client.get("/api/admin/me").status_code == 200

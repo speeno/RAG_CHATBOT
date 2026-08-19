@@ -1,12 +1,16 @@
 "use client";
 
 import { Fragment, useState } from "react";
-import type { ChatResponse, Source } from "@/lib/api";
+import { api, type ChatResponse, type Source } from "@/lib/api";
 import { Icon } from "@/components/Icon";
+
+/** 상담원 연결 URL(외부 채널)이 설정돼 있으면 새 창으로, 아니면 문의 폼으로 접수 (PRD §43) */
+const HANDOFF_URL = process.env.NEXT_PUBLIC_HANDOFF_URL ?? "";
 
 export type BotMsg = {
   id: string;
   messageId: string | null;
+  userQuestion?: string;
   text: string;
   sources: Source[];
   candidateSources: Source[];
@@ -52,9 +56,28 @@ export function BotMessage({
   onAsk: (q: string) => void;
 }) {
   const [showReasons, setShowReasons] = useState(false);
+  const [inq, setInq] = useState<{ kind: "inquiry" | "agent"; contact: string; content: string; busy: boolean; done: boolean; error: string | null } | null>(null);
   const done = msg.done;
   const failClosed = done ? !done.answerable : false;
   const sources = msg.sources.length ? msg.sources : [];
+
+  const openInquiry = (kind: "inquiry" | "agent") => {
+    if (kind === "agent" && HANDOFF_URL) {
+      window.open(HANDOFF_URL, "_blank", "noopener");
+      return;
+    }
+    setInq({ kind, contact: "", content: msg.userQuestion ? `[질문] ${msg.userQuestion}\n` : "", busy: false, done: false, error: null });
+  };
+  const submitInquiry = async () => {
+    if (!inq || !inq.content.trim()) return;
+    setInq({ ...inq, busy: true, error: null });
+    try {
+      await api.createInquiry({ conversation_id: done?.conversation_id ?? null, message_id: msg.messageId, kind: inq.kind, contact: inq.contact || null, content: inq.content.trim() });
+      setInq({ ...inq, busy: false, done: true });
+    } catch (e) {
+      setInq({ ...inq, busy: false, error: (e as Error).message });
+    }
+  };
 
   return (
     <div className="msg-bot">
@@ -91,10 +114,28 @@ export function BotMessage({
                 <b>현재 등록된 자료에서는 해당 내용을 확인하기 어렵습니다.</b>
                 <p>AI가 보유한 지식 범위를 벗어난 질문이거나, 관련 정책이 아직 등록되지 않았을 수 있습니다. 담당자에게 문의하시거나 다른 표현으로 다시 질문해 보세요.</p>
                 <div className="acts">
-                  <button className="btn sm"><Icon name="headset" /> 상담원 연결</button>
-                  <button className="btn sm"><Icon name="mail" /> 문의 남기기</button>
+                  <button className="btn sm" onClick={() => openInquiry("agent")}><Icon name="headset" /> 상담원 연결</button>
+                  <button className="btn sm" onClick={() => openInquiry("inquiry")}><Icon name="mail" /> 문의 남기기</button>
                   <button className="btn sm" onClick={() => onAsk("환불은 어떻게 신청하나요?")}><Icon name="file-text" /> 관련 정책 보기</button>
                 </div>
+                {inq && (
+                  <div className="inquiry-form">
+                    {inq.done ? (
+                      <div className="inq-done"><Icon name="check-circle" /> {inq.kind === "agent" ? "상담원 연결 요청이 접수되었습니다. 담당자가 확인 후 연락드립니다." : "문의가 접수되었습니다. 담당자가 확인 후 답변드립니다."}</div>
+                    ) : (
+                      <>
+                        <div className="inq-title">{inq.kind === "agent" ? "상담원 연결 요청" : "문의 남기기"}</div>
+                        <input className="input" placeholder="연락처 (이메일 또는 전화, 선택)" value={inq.contact} onChange={(e) => setInq({ ...inq, contact: e.target.value })} />
+                        <textarea className="textarea" rows={3} placeholder="문의 내용을 입력해 주세요" value={inq.content} onChange={(e) => setInq({ ...inq, content: e.target.value })} />
+                        {inq.error && <div className="inq-err">전송 실패: {inq.error}</div>}
+                        <div className="acts" style={{ marginTop: 8 }}>
+                          <button className="btn sm primary" disabled={inq.busy || !inq.content.trim()} onClick={submitInquiry}>{inq.busy ? "전송 중…" : "접수하기"}</button>
+                          <button className="btn sm" onClick={() => setInq(null)}>취소</button>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
           )}

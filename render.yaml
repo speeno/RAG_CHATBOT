@@ -22,6 +22,8 @@ services:
         sync: false
       - key: CORS_ORIGIN_REGEX     # 예: https://.*\.vercel\.app  (Vercel Preview 도메인 허용)
         sync: false
+      - key: ADMIN_TOKEN           # 관리자 화면/API 보호 토큰 (긴 랜덤 문자열)
+        sync: false
       # ── LLM / 임베딩 (하나 이상 필수. 없으면 extractive/hash 오프라인 데모 모드) ──
       - key: ANTHROPIC_API_KEY
         sync: false

@@ -72,7 +72,7 @@ export function ChatView() {
       setMessages((prev) => [
         ...prev,
         { kind: "user", id: `u-${Date.now()}`, text: q, time: nowTime() },
-        { kind: "bot", id: botId, messageId: null, text: "", sources: [], candidateSources: [], streaming: true, done: null, time: nowTime() },
+        { kind: "bot", id: botId, messageId: null, userQuestion: q, text: "", sources: [], candidateSources: [], streaming: true, done: null, time: nowTime() },
       ]);
       setBusy(true);
       const ac = new AbortController();

@@ -10,9 +10,11 @@ const USER_NAV = [
   { href: "/", label: "상담하기", icon: "chat" },
 ];
 const ADMIN_NAV = [
+  { href: "/admin", label: "대시보드", icon: "line-chart" },
   { href: "/admin/knowledge", label: "지식베이스", icon: "book-open" },
   { href: "/admin/search-test", label: "검색 테스트", icon: "search" },
   { href: "/admin/logs", label: "상담 로그", icon: "user-log" },
+  { href: "/admin/unanswered", label: "미답변 분석", icon: "help" },
 ];
 
 export function Sidebar() {

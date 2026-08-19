@@ -8,18 +8,19 @@
 |---|---|---|---|---|---|---|---|
 | U1 | 홈(추천 질문·출처·👍/👎) | `user/01-home` | §36, §42 | 1 | `/` ChatView | `/api/chat/stream`, `/api/feedback` | ✅ 완료 |
 | U2 | 상담하기(멀티턴·관련 문서 패널) | `user/02-chat` | §6 | 1 | `/` | `/api/chat/stream`, `/api/conversations/{id}` | ✅ 완료 |
-| U3 | Fail-Closed 핸드오프 | `user/03-chat-no-answer-handoff` | §24, §43 | 1 | `Messages.tsx` handoff 카드 | — | ⚠️ 부분 — 카드는 있으나 **상담원 연결 / 문의 남기기 버튼이 동작 없음** |
+| U3 | Fail-Closed 핸드오프 | `user/03-chat-no-answer-handoff` | §24, §43 | 1 | `Messages.tsx` handoff 카드 + 문의 폼 | `POST /api/inquiries` (`NEXT_PUBLIC_HANDOFF_URL` 설정 시 상담원 연결은 외부 URL) | ✅ 완료(2026-08-20) |
 | U4 | 부정 피드백 사유 선택 | `user/04-feedback-negative` | §36 | 1 | `Messages.tsx` | `/api/feedback` | ✅ 완료 |
-| A1 | **대시보드** | `admin/01-dashboard` | §34 | 3 | ❌ 없음 | ❌ 집계 API 없음 | 🔴 미구현 |
+| A1 | 대시보드 | `admin/01-dashboard` | §34 | 3 | `/admin` DashboardView | `GET /api/stats/overview` | ✅ 완료(2026-08-20) — Top-k Hit 지표는 골든셋(Phase 2) 이후 |
 | A2 | 지식베이스 목록/문서 정보 | `admin/02-knowledge-base-list` | §30~31 | 1 | `/admin/knowledge` | `/api/knowledge*` | ✅ 완료 |
 | A3 | 문서 업로드·색인 진행 | `admin/03-document-upload-indexing` | §30 | 1 | `/admin/knowledge` | `/api/knowledge` POST·폴링 | ✅ 완료 |
 | A4 | 검색 테스트 | `admin/04-search-test` | §32 | 2 | `/admin/search-test` SearchTestView | `POST /api/search/test`(정규화·Rewrite·임계값·Hit) | ✅ 완료(2026-08-20) — BM25/Reranker 열은 Phase 2 후 채움 |
 | A5 | 상담 로그 | `admin/05-conversation-logs` | §33 | 3 | `/admin/logs` LogsView | `GET /api/logs`(필터·페이징), `/api/logs/{message_id}`, `/api/logs/export.csv` | ✅ 완료(2026-08-20) |
-| A6 | **미답변 분석** | `admin/06-unanswered-analysis` | §35 | 3 | ❌ 없음 | ❌ 집계 API 없음 | 🔴 미구현 |
+| A6 | 미답변 분석 | `admin/06-unanswered-analysis` | §35 | 3 | `/admin/unanswered` UnansweredView | `GET /api/stats/unanswered`, `PATCH /api/stats/unanswered/{key}`, `/api/inquiries` | ✅ 완료(2026-08-20) |
 | — | 플로팅 챗봇 위젯 | (목업 없음) | §41 | 선택 | ❌ | — | ⚪ 미구현(선택) |
-| — | 문서 버전 관리 / 권한 관리(RBAC) | (목업 없음) | §29, Phase 3 | 3 | ❌ | ❌ | ⚪ 미구현(화면 설계 필요) |
+| — | 관리자 인증 | (목업 없음) | §29 1단계 | 3 | `/admin/*` AdminGate(토큰 로그인) | `ADMIN_TOKEN` + `GET /api/admin/me`, 관리자 라우터 401 | ✅ 완료(2026-08-20) — 단일 토큰; 역할/문서별 권한(RBAC)은 미구현 |
+| — | 문서 버전 관리 / RBAC(역할·문서별 권한) | (목업 없음) | §29, Phase 3 | 3 | ❌ | ❌ | ⚪ 미구현(화면 설계 필요) |
 
-사이드바(`components/Sidebar.tsx`)에는 현재 `상담하기`, `지식베이스`, `검색 테스트`, `상담 로그` 메뉴가 있다. A1·A6 구현 시 메뉴 추가 필요.
+사이드바(`components/Sidebar.tsx`): `상담하기` / 관리자 `대시보드`, `지식베이스`, `검색 테스트`, `상담 로그`, `미답변 분석` — 목업 10개 화면 모두 구현됨.
 
 ---
 
@@ -47,8 +48,8 @@
 
 백엔드 보강: `GET /api/logs`에 `offset`, `from/to`, `answerable`, `feedback`, `q` 필터 + `total` 반환; `GET /api/logs/export.csv`.
 
-### A1. 대시보드 — `/admin` (Phase 3, 우선순위 3)
-목업 `admin/01-dashboard.png` · PRD §34. 집계 API 신설 필요.
+### A1. 대시보드 — `/admin` ✅ 구현 완료 (2026-08-20)
+목업 `admin/01-dashboard.png` · PRD §34. 구현: `DashboardView.tsx` + `components/admin/charts.tsx`(SVG 막대/가로막대/스택), API `GET /api/stats/overview?date_from&date_to&tz_offset`(`app/core/stats.py`: KPI+이전 기간 대비 delta, 일별, 카테고리 TOP5, 피드백 비율, 주요 질문 TOP5).
 
 화면 요소:
 - 기간 선택(기본 최근 7일) + 지난 기간 대비 증감
@@ -58,8 +59,8 @@
 
 백엔드 보강: `GET /api/stats/overview?from&to`(KPI+증감), `GET /api/stats/daily`, `GET /api/stats/top-questions`, `GET /api/stats/categories` — 모두 `turn_logs`(+`messages`, `documents`) 집계 SQL.
 
-### A6. 미답변 분석 — `/admin/unanswered` (Phase 3, 우선순위 4)
-목업 `admin/06-unanswered-analysis.png` · PRD §35. "미답변 → 지식 추가 → RAG 개선" 루프의 핵심 화면.
+### A6. 미답변 분석 — `/admin/unanswered` ✅ 구현 완료 (2026-08-20)
+목업 `admin/06-unanswered-analysis.png` · PRD §35. 구현: `UnansweredView.tsx`, API `GET /api/stats/unanswered`(TOP N·증가율·최고 점수·추천(new_document/improve_document)·처리 상태), `PATCH /api/stats/unanswered/{key}`(`unanswered_reviews` 테이블), 접수된 문의(`GET/PATCH /api/inquiries`). TOP 항목에서 지식베이스(`?suggest=`)·상담 로그(`?q=`)로 이동.
 
 화면 요소:
 - KPI: 미답변 건수, 미답변 비율, 최근 증가율, 처리 완료율
@@ -70,8 +71,8 @@
 
 백엔드 보강: `GET /api/stats/unanswered?from&to`(TOP N·추이·분포), `PATCH /api/unanswered/{key}`(처리 상태).
 
-### U3. Fail-Closed 핸드오프 버튼 동작 (Phase 1 잔여, 우선순위 5)
-`Messages.tsx`의 **상담원 연결**·**문의 남기기** 버튼에 동작이 없다(관련 정책 보기는 동작). PRD §43은 문의 Form/Email/전화/Live Chat 중 하나로 연결. 최소 구현: 문의 남기기 → 간단한 폼(이메일·내용) 모달 + `POST /api/inquiries`(conversation_id, message_id 저장) / 상담원 연결 → 설정된 외부 URL(`NEXT_PUBLIC_HANDOFF_URL`) 또는 동일 폼.
+### U3. Fail-Closed 핸드오프 버튼 ✅ 구현 완료 (2026-08-20)
+`Messages.tsx`: 문의 남기기/상담원 연결 → 인라인 폼(연락처 선택, 내용에 질문 프리필) → `POST /api/inquiries`(conversation_id·message_id·kind 저장). `NEXT_PUBLIC_HANDOFF_URL` 설정 시 상담원 연결은 외부 채널을 새 창으로 연다. 접수 건은 미답변 분석 화면에서 처리.
 
 ### 선택/후순위
 - **플로팅 챗봇 위젯**(PRD §41): 외부 사이트 임베드용 우측 하단 버튼 + 미니 채팅 패널. 별도 목업 없음.
@@ -81,12 +82,11 @@
 
 ---
 
-## 제안 구현 순서
-1. ~~A4 검색 테스트~~ ✅ 완료
-2. ~~A5 상담 로그~~ ✅ 완료
-3. **A1 대시보드** — 집계 API 신설, 차트 컴포넌트(외부 라이브러리 없이 SVG) 2~3일.
-4. **A6 미답변 분석** — 대시보드 집계 재사용 + 처리 상태 테이블 2일.
-5. **U3 핸드오프 버튼** — 반나절.
-6. 관리자 인증(간단한 토큰/Basic) → 이후 RBAC·버전 관리·위젯.
+## 구현 순서 (완료)
+1. ~~A4 검색 테스트~~ ✅ 2. ~~A5 상담 로그~~ ✅ 3. ~~A1 대시보드~~ ✅ 4. ~~A6 미답변 분석~~ ✅ 5. ~~U3 핸드오프 버튼~~ ✅ 6. ~~관리자 인증(단일 토큰)~~ ✅
+
+## 남은 것 (후순위 / Phase 2~4)
+- 검색 품질(Phase 2): BM25 하이브리드·Reranker·Multi Query → 검색 테스트 화면의 BM25/Reranker 열·Multi Query 카드 채우기, 골든셋 기반 Top-k Hit → 대시보드 Retrieval 지표
+- RBAC(역할·문서별 권한), 문서 버전 관리 화면, 플로팅 챗봇 위젯(§41), 상담원 Agent-assist(§5.2)
 
 각 화면은 `docs/design/html/admin/*.html`의 토큰/컴포넌트(`shared.css`)를 그대로 재사용해 `app/globals.css`에 옮기면 된다.

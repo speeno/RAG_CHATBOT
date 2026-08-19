@@ -98,9 +98,30 @@ POSTGRES_SCHEMA = [
     "ALTER TABLE turn_logs ADD COLUMN IF NOT EXISTS seq BIGSERIAL",
     "ALTER TABLE messages ADD COLUMN IF NOT EXISTS seq BIGSERIAL",
     "CREATE INDEX IF NOT EXISTS idx_turn_logs_created ON turn_logs(created_at)",
+    """
+    CREATE TABLE IF NOT EXISTS unanswered_reviews (
+      question_key TEXT PRIMARY KEY,
+      status TEXT NOT NULL DEFAULT 'open',
+      note TEXT,
+      updated_at TEXT NOT NULL
+    )
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS inquiries (
+      seq BIGSERIAL,
+      id TEXT PRIMARY KEY,
+      conversation_id TEXT,
+      message_id TEXT,
+      kind TEXT NOT NULL DEFAULT 'inquiry',
+      contact TEXT,
+      content TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'open',
+      created_at TEXT NOT NULL
+    )
+    """,
 ]
 
-TABLES = ("turn_logs", "messages", "conversations", "chunks", "documents")
+TABLES = ("inquiries", "unanswered_reviews", "turn_logs", "messages", "conversations", "chunks", "documents")
 
 
 class PostgresDatabase(BaseDatabase):

@@ -151,10 +151,39 @@ class LogsPage(BaseModel):
     offset: int
 
 
+class UnansweredReviewPatch(BaseModel):
+    status: Literal["open", "resolved"]
+    note: str | None = Field(default=None, max_length=500)
+
+
+class InquiryCreate(BaseModel):
+    conversation_id: str | None = None
+    message_id: str | None = None
+    kind: Literal["inquiry", "agent"] = "inquiry"
+    contact: str | None = Field(default=None, max_length=200)
+    content: str = Field(min_length=1, max_length=2000)
+
+
+class InquiryOut(BaseModel):
+    id: str
+    conversation_id: str | None = None
+    message_id: str | None = None
+    kind: str
+    contact: str | None = None
+    content: str
+    status: str
+    created_at: str
+
+
+class InquiryPatch(BaseModel):
+    status: Literal["open", "done"]
+
+
 class HealthOut(BaseModel):
     status: str
     db_backend: str = "sqlite"
     db_ok: bool = True
+    admin_auth: bool = False
     llm_provider: str
     embedding_provider: str
     score_threshold: float

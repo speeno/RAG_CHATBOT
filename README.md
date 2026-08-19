@@ -113,7 +113,11 @@ HTML 목업 보기: `docs/design/html/index.html`을 브라우저로 열거나, 
 | GET | `/api/knowledge/{id}/chunks` | 청크 목록 |
 | POST | `/api/knowledge/{id}/reindex` | 재색인 |
 | POST | `/api/search/test` | 검색 테스트(정규화·Rewrite·임계값 판정·정답 문서 Hit·청크) — `/admin/search-test` 화면 |
-| GET | `/api/health` | 프로바이더/임계값/색인 청크 수 |
+| GET | `/api/stats/overview`, `/api/stats/unanswered` | 대시보드 KPI/추이/카테고리/피드백/주요 질문, 미답변 TOP N·추천·처리 상태 (`/admin`, `/admin/unanswered`) |
+| PATCH | `/api/stats/unanswered/{key}` | 미답변 질문 처리 상태/메모 |
+| POST/GET/PATCH | `/api/inquiries` | 상담원 연결·문의 접수(공개) / 목록·처리(관리자) |
+| GET | `/api/admin/me` | 관리자 토큰 검증 (`ADMIN_TOKEN` 설정 시 관리자 API는 `Authorization: Bearer`) |
+| GET | `/api/health` | 프로바이더/임계값/색인 청크 수/`admin_auth` |
 
 ## 다음 단계 (Phase 2~)
 

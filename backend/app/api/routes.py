@@ -8,9 +8,28 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, Uplo
 from fastapi.responses import StreamingResponse
 
 from app.api import schemas as S
+from app.core import stats as ST
 from app.core.services import Services
 
 router = APIRouter(prefix="/api")
+
+
+# ── 관리자 인증 (PRD §29 권한 관리의 1단계: 단일 관리자 토큰) ────────
+def require_admin(request: Request) -> None:
+    """`ADMIN_TOKEN`이 설정돼 있으면 `Authorization: Bearer <token>` 또는 `X-Admin-Token` 헤더를 요구한다.
+    미설정(로컬 개발)이면 통과하되 /api/health 의 admin_auth=false 로 드러낸다."""
+    import secrets
+
+    token = request.app.state.services.settings.admin_token
+    if not token:
+        return
+    auth = request.headers.get("authorization", "")
+    given = auth[7:].strip() if auth.lower().startswith("bearer ") else request.headers.get("x-admin-token", "").strip()
+    if not given or not secrets.compare_digest(given, token):
+        raise HTTPException(401, "admin token required", headers={"WWW-Authenticate": "Bearer"})
+
+
+admin = APIRouter(prefix="/api", dependencies=[Depends(require_admin)])
 
 MAX_UPLOAD_BYTES = 5 * 1024 * 1024
 ALLOWED_EXT = (".md", ".markdown", ".txt", ".html", ".htm")
@@ -84,7 +103,7 @@ def _log_filters(date_from: str | None, date_to: str | None, answerable: bool | 
             "answerable": answerable, "feedback": feedback or None, "q": (q or "").strip() or None}
 
 
-@router.get("/logs", response_model=S.LogsPage)
+@admin.get("/logs", response_model=S.LogsPage)
 def logs(limit: int = 20, offset: int = 0, date_from: str | None = None, date_to: str | None = None,
          answerable: bool | None = None, feedback: str | None = None, q: str | None = None,
          svc: Services = Depends(get_services)) -> dict[str, Any]:
@@ -96,7 +115,7 @@ def logs(limit: int = 20, offset: int = 0, date_from: str | None = None, date_to
             "limit": limit, "offset": offset}
 
 
-@router.get("/logs/export.csv")
+@admin.get("/logs/export.csv")
 def logs_export(date_from: str | None = None, date_to: str | None = None, answerable: bool | None = None,
                 feedback: str | None = None, q: str | None = None, svc: Services = Depends(get_services)) -> StreamingResponse:
     """현재 필터의 로그를 CSV로 내보낸다(최대 5,000건, UTF-8 BOM → Excel 호환)."""
@@ -122,7 +141,7 @@ def logs_export(date_from: str | None = None, date_to: str | None = None, answer
                              headers={"Content-Disposition": "attachment; filename=conversation-logs.csv"})
 
 
-@router.get("/logs/{message_id}", response_model=S.TurnLogOut)
+@admin.get("/logs/{message_id}", response_model=S.TurnLogOut)
 def log_detail(message_id: str, svc: Services = Depends(get_services)) -> dict[str, Any]:
     row = svc.db.get_turn_log(message_id)
     if not row:
@@ -131,12 +150,12 @@ def log_detail(message_id: str, svc: Services = Depends(get_services)) -> dict[s
 
 
 # ── knowledge ───────────────────────────────────────────────────
-@router.get("/knowledge", response_model=list[S.DocumentOut])
+@admin.get("/knowledge", response_model=list[S.DocumentOut])
 def list_knowledge(svc: Services = Depends(get_services)) -> list[dict[str, Any]]:
     return svc.db.list_documents()
 
 
-@router.post("/knowledge", response_model=S.DocumentOut, status_code=201)
+@admin.post("/knowledge", response_model=S.DocumentOut, status_code=201)
 async def upload_knowledge(
     svc: Services = Depends(get_services),
     file: UploadFile | None = File(default=None),
@@ -187,7 +206,7 @@ async def upload_knowledge(
     return doc
 
 
-@router.get("/knowledge/{doc_id}", response_model=S.DocumentDetail)
+@admin.get("/knowledge/{doc_id}", response_model=S.DocumentDetail)
 def get_knowledge(doc_id: str, svc: Services = Depends(get_services)) -> dict[str, Any]:
     doc = svc.db.get_document(doc_id)
     if not doc:
@@ -195,14 +214,14 @@ def get_knowledge(doc_id: str, svc: Services = Depends(get_services)) -> dict[st
     return doc
 
 
-@router.get("/knowledge/{doc_id}/chunks", response_model=list[S.ChunkOut])
+@admin.get("/knowledge/{doc_id}/chunks", response_model=list[S.ChunkOut])
 def get_chunks(doc_id: str, svc: Services = Depends(get_services)) -> list[dict[str, Any]]:
     if not svc.db.get_document(doc_id):
         raise HTTPException(404, "document not found")
     return svc.db.list_chunks(doc_id)
 
 
-@router.patch("/knowledge/{doc_id}", response_model=S.DocumentOut)
+@admin.patch("/knowledge/{doc_id}", response_model=S.DocumentOut)
 def patch_knowledge(doc_id: str, patch: S.DocumentPatch, svc: Services = Depends(get_services)) -> dict[str, Any]:
     if not svc.db.get_document(doc_id):
         raise HTTPException(404, "document not found")
@@ -212,14 +231,14 @@ def patch_knowledge(doc_id: str, patch: S.DocumentPatch, svc: Services = Depends
     return svc.db.get_document(doc_id)  # type: ignore[return-value]
 
 
-@router.delete("/knowledge/{doc_id}", status_code=204)
+@admin.delete("/knowledge/{doc_id}", status_code=204)
 def delete_knowledge(doc_id: str, svc: Services = Depends(get_services)) -> None:
     if not svc.db.delete_document(doc_id):
         raise HTTPException(404, "document not found")
     svc.store.invalidate()
 
 
-@router.post("/knowledge/{doc_id}/reindex", response_model=S.DocumentOut)
+@admin.post("/knowledge/{doc_id}/reindex", response_model=S.DocumentOut)
 def reindex_knowledge(doc_id: str, sync: bool = False, svc: Services = Depends(get_services)) -> dict[str, Any]:
     doc = svc.db.get_document(doc_id)
     if not doc:
@@ -231,8 +250,62 @@ def reindex_knowledge(doc_id: str, sync: bool = False, svc: Services = Depends(g
     return svc.db.get_document(doc_id)  # type: ignore[return-value]
 
 
+@admin.get("/admin/me")
+def admin_me() -> dict[str, Any]:
+    """토큰 검증용(프론트 로그인 게이트). 401이면 토큰 불일치."""
+    return {"ok": True, "role": "admin"}
+
+
+# ── stats (PRD §34 대시보드 · §35 미답변 분석) ─────────────────────
+def _range(date_from: str | None, date_to: str | None, tz_offset: int, default_days: int) -> ST.Range:
+    try:
+        return ST.make_range(date_from, date_to, tz_offset, default_days)
+    except ValueError as e:
+        raise HTTPException(422, f"invalid date: {e}") from e
+
+
+@admin.get("/stats/overview")
+def stats_overview(date_from: str | None = None, date_to: str | None = None, tz_offset: int = 540,
+                   svc: Services = Depends(get_services)) -> dict[str, Any]:
+    """대시보드 KPI·일별 추이·카테고리·피드백·주요 질문 (기본 최근 7일, KST)."""
+    return ST.dashboard(svc.db, _range(date_from, date_to, tz_offset, 7))
+
+
+@admin.get("/stats/unanswered")
+def stats_unanswered(date_from: str | None = None, date_to: str | None = None, tz_offset: int = 540, top_n: int = 10,
+                     svc: Services = Depends(get_services)) -> dict[str, Any]:
+    """미답변 분석: TOP N·추이·카테고리·개선 추천·처리 상태 (기본 최근 7일)."""
+    return ST.unanswered(svc.db, _range(date_from, date_to, tz_offset, 7), top_n=max(1, min(top_n, 50)))
+
+
+@admin.patch("/stats/unanswered/{question_key}")
+def patch_unanswered(question_key: str, body: S.UnansweredReviewPatch, svc: Services = Depends(get_services)) -> dict[str, Any]:
+    return svc.db.upsert_unanswered_review(question_key, body.status, body.note)
+
+
+# ── inquiries (PRD §43 상담원 연결 / 문의 남기기) ──────────────────
+@router.post("/inquiries", response_model=S.InquiryOut, status_code=201)
+def create_inquiry(body: S.InquiryCreate, svc: Services = Depends(get_services)) -> dict[str, Any]:
+    return svc.db.add_inquiry(conversation_id=body.conversation_id, message_id=body.message_id, kind=body.kind,
+                              contact=(body.contact or "").strip() or None, content=body.content.strip())
+
+
+@admin.get("/inquiries", response_model=list[S.InquiryOut])
+def list_inquiries(status: str | None = None, limit: int = 100, svc: Services = Depends(get_services)) -> list[dict[str, Any]]:
+    if status not in (None, "open", "done"):
+        raise HTTPException(422, "status must be open|done")
+    return svc.db.list_inquiries(limit=max(1, min(limit, 500)), status=status)
+
+
+@admin.patch("/inquiries/{inquiry_id}", response_model=dict)
+def patch_inquiry(inquiry_id: str, body: S.InquiryPatch, svc: Services = Depends(get_services)) -> dict[str, Any]:
+    if not svc.db.set_inquiry_status(inquiry_id, body.status):
+        raise HTTPException(404, "inquiry not found")
+    return {"ok": True}
+
+
 # ── search test (관리자용 검색 디버그, PRD §32) ───────────────────
-@router.post("/search/test", response_model=S.SearchTestResponse)
+@admin.post("/search/test", response_model=S.SearchTestResponse)
 def search_test(req: S.SearchTestRequest, svc: Services = Depends(get_services)) -> dict[str, Any]:
     """관리자 검색 테스트: 정규화 → (선택) Rewrite → 검색 → 임계값/정답 문서 기준 평가."""
     normalized = " ".join(req.query.split())

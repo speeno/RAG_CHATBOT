@@ -49,9 +49,10 @@ class Settings(BaseSettings):
     database_url: str | None = None               # postgresql://… 설정 시 Postgres(Supabase) 사용
     cors_origins: str = "http://localhost:3100,http://localhost:3000"
     cors_origin_regex: str | None = None          # 예: https://.*\.vercel\.app (Vercel Preview 도메인)
+    admin_token: str | None = None                # 설정 시 관리자 API(/knowledge, /logs, /stats, /search/test …)에 Bearer 토큰 필요
 
     @field_validator("retrieval_score_threshold", "anthropic_api_key", "voyage_api_key", "openai_api_key",
-                     "database_url", "cors_origin_regex", mode="before")
+                     "database_url", "cors_origin_regex", "admin_token", mode="before")
     @classmethod
     def _empty_to_none(cls, v):
         if isinstance(v, str):

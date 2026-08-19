@@ -6,9 +6,11 @@ import { api } from "@/lib/api";
 
 const TITLES: Record<string, string> = {
   "/": "상담하기",
+  "/admin": "대시보드",
   "/admin/knowledge": "지식베이스 관리",
   "/admin/search-test": "검색 테스트",
   "/admin/logs": "상담 로그",
+  "/admin/unanswered": "미답변 분석",
 };
 
 export function Topbar() {

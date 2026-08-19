@@ -90,6 +90,25 @@ CREATE TABLE IF NOT EXISTS turn_logs (
   created_at TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_turn_logs_message ON turn_logs(message_id);
+CREATE INDEX IF NOT EXISTS idx_turn_logs_created ON turn_logs(created_at);
+
+CREATE TABLE IF NOT EXISTS unanswered_reviews (
+  question_key TEXT PRIMARY KEY,      -- normalize_question(user_query)
+  status TEXT NOT NULL DEFAULT 'open', -- open | resolved
+  note TEXT,
+  updated_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS inquiries (
+  id TEXT PRIMARY KEY,
+  conversation_id TEXT,
+  message_id TEXT,
+  kind TEXT NOT NULL DEFAULT 'inquiry', -- inquiry | agent
+  contact TEXT,
+  content TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'open',  -- open | done
+  created_at TEXT NOT NULL
+);
 """
 
 # 하위 호환 별칭
@@ -320,6 +339,62 @@ class BaseDatabase(ABC):
         with self.connect() as conn:
             row = self._exec(conn, f"SELECT COUNT(*) AS n FROM turn_logs{where}", params).fetchone()
         return int(row["n"] if row else 0)
+
+    def turn_log_rows(self, created_from: str, created_to: str) -> list[dict[str, Any]]:
+        """통계 집계용 경량 조회: [created_from, created_to) 범위의 턴 로그(답변 본문 제외)."""
+        with self.connect() as conn:
+            rows = self._exec(
+                conn,
+                "SELECT conversation_id, message_id, user_query, retrieved, answerable, feedback, retrieval_ms, llm_ms, total_ms, created_at"
+                " FROM turn_logs WHERE created_at >= ? AND created_at < ? ORDER BY created_at",
+                (created_from, created_to),
+            ).fetchall()
+        out = []
+        for r in rows:
+            d = dict(r)
+            d["retrieved"] = json.loads(d["retrieved"] or "[]")
+            d["answerable"] = None if d["answerable"] is None else bool(d["answerable"])
+            out.append(d)
+        return out
+
+    # ── unanswered reviews (PRD §35 처리 상태) ───────────────────
+    def list_unanswered_reviews(self) -> list[dict[str, Any]]:
+        with self.connect() as conn:
+            rows = self._exec(conn, "SELECT * FROM unanswered_reviews").fetchall()
+        return [dict(r) for r in rows]
+
+    def upsert_unanswered_review(self, question_key: str, status: str, note: str | None) -> dict[str, Any]:
+        ts = now_iso()
+        with self.connect() as conn:
+            cur = self._exec(conn, "UPDATE unanswered_reviews SET status=?, note=?, updated_at=? WHERE question_key=?",
+                             (status, note, ts, question_key))
+            if cur.rowcount == 0:
+                self._exec(conn, "INSERT INTO unanswered_reviews (question_key, status, note, updated_at) VALUES (?,?,?,?)",
+                           (question_key, status, note, ts))
+        return {"question_key": question_key, "status": status, "note": note, "updated_at": ts}
+
+    # ── inquiries (PRD §43 상담원 연결/문의 남기기) ───────────────
+    def add_inquiry(self, *, conversation_id: str | None, message_id: str | None, kind: str, contact: str | None,
+                    content: str) -> dict[str, Any]:
+        row = {"id": new_id(), "conversation_id": conversation_id, "message_id": message_id, "kind": kind,
+               "contact": contact, "content": content, "status": "open", "created_at": now_iso()}
+        with self.connect() as conn:
+            self._exec(conn, "INSERT INTO inquiries (id, conversation_id, message_id, kind, contact, content, status, created_at)"
+                             " VALUES (?,?,?,?,?,?,?,?)", list(row.values()))
+        return row
+
+    def list_inquiries(self, limit: int = 100, status: str | None = None) -> list[dict[str, Any]]:
+        where = " WHERE status=?" if status else ""
+        params: list[Any] = [status] if status else []
+        with self.connect() as conn:
+            rows = self._exec(conn, f"SELECT * FROM inquiries{where} ORDER BY created_at DESC, {self._MESSAGE_ORDER} DESC LIMIT ?",
+                              [*params, limit]).fetchall()
+        return [{k: v for k, v in dict(r).items() if k != "seq"} for r in rows]
+
+    def set_inquiry_status(self, inquiry_id: str, status: str) -> bool:
+        with self.connect() as conn:
+            cur = self._exec(conn, "UPDATE inquiries SET status=? WHERE id=?", (status, inquiry_id))
+        return cur.rowcount > 0
 
     def get_turn_log(self, message_id: str) -> dict[str, Any] | None:
         with self.connect() as conn:

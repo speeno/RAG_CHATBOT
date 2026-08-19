@@ -37,6 +37,7 @@ class Services:
             "status": "ok" if db_ok else "degraded",
             "db_backend": self.db.name,
             "db_ok": db_ok,
+            "admin_auth": bool(self.settings.admin_token),
             "llm_provider": self.llm.name,
             "embedding_provider": self.embedder.name,
             "score_threshold": self.settings.score_threshold,

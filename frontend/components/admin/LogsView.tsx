@@ -74,6 +74,12 @@ export function LogsView() {
     load();
   }, [load]);
 
+  // 미답변 분석 → "상담 로그에서 보기"(?q=질문)로 넘어온 경우 검색어 프리필
+  useEffect(() => {
+    const initial = new URLSearchParams(window.location.search).get("q");
+    if (initial) { setQInput(initial); setQ(initial); }
+  }, []);
+
   useEffect(() => {
     setConv(null);
     setShowConv(false);
@@ -123,7 +129,7 @@ export function LogsView() {
           <p className="page-sub">사용자 상담 내역과 응답 품질을 확인하고 관리할 수 있습니다. 모든 턴은 질문·재작성 쿼리·검색 문서·점수·답변·응답 시간·피드백과 함께 기록됩니다.</p>
         </div>
         <div className="st-headbtns">
-          <a className="btn" href={api.logsExportUrl({ ...query, limit: undefined, offset: undefined })} target="_blank" rel="noreferrer"><Icon name="file-text" /> 내보내기(CSV)</a>
+          <button className="btn" onClick={() => api.downloadLogsCsv({ ...query, limit: undefined, offset: undefined }).catch((e) => setError(`CSV 내보내기 실패: ${(e as Error).message}`))}><Icon name="file-text" /> 내보내기(CSV)</button>
           <button className="btn" onClick={load}><Icon name="refresh" /> 새로고침</button>
         </div>
       </div>
