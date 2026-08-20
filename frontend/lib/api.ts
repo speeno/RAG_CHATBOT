@@ -286,7 +286,8 @@ export const api = {
       body: JSON.stringify({ message_id, rating, ...detail }),
     }).then(j<{ ok: boolean; escalated: boolean }>),
 
-  listDocuments: () => f(`${API_URL}/api/knowledge`, { cache: "no-store" }).then(j<DocumentItem[]>),
+  // 업로드 직후에는 서버가 색인 작업(CPU) 중이라 첫 응답이 늦거나 실패할 수 있어 짧게 재시도한다
+  listDocuments: () => fetchWithRetry(`${API_URL}/api/knowledge`, { cache: "no-store" }, 2, 800).then(j<DocumentItem[]>),
   getChunks: (id: string) => f(`${API_URL}/api/knowledge/${id}/chunks`, { cache: "no-store" }).then(j<ChunkItem[]>),
   uploadDocument: (form: FormData) => f(`${API_URL}/api/knowledge`, { method: "POST", body: form }).then(j<DocumentItem>),
   deleteDocument: (id: string) => f(`${API_URL}/api/knowledge/${id}`, { method: "DELETE" }).then(j<void>),

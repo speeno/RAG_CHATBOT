@@ -35,15 +35,25 @@ export function KnowledgeView() {
   const [filter, setFilter] = useState<"all" | "active" | "inactive" | "error">("all");
   const [q, setQ] = useState("");
 
+  const loadSeq = useRef(0);       // 늦게 도착한 이전 응답이 최신 목록을 덮어쓰지 않도록
+  const retryTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const load = useCallback(async () => {
+    const seq = ++loadSeq.current;
     try {
       const list = await api.listDocuments();
+      if (seq !== loadSeq.current) return;
       setDocs(list);
       setError(null);
     } catch (e) {
-      setError(`문서 목록을 불러오지 못했습니다: ${(e as Error).message}`);
+      if (seq !== loadSeq.current) return;
+      // 업로드/색인 직후 서버가 바쁘면 일시 실패할 수 있다 → 오류를 띄우되 3초 후 자동 재시도
+      setError(`문서 목록을 불러오지 못했습니다: ${(e as Error).message} — 잠시 후 자동으로 다시 시도합니다.`);
+      if (retryTimer.current) clearTimeout(retryTimer.current);
+      retryTimer.current = setTimeout(() => load(), 3000);
     }
   }, []);
+
+  useEffect(() => () => { if (retryTimer.current) clearTimeout(retryTimer.current); }, []);
 
   useEffect(() => {
     load();
@@ -217,11 +227,11 @@ function UploadForm({ onUploaded }: { onUploaded: () => void }) {
         });
         const doc = await api.uploadDocument(form);
         ok.push(doc.title);
-        onUploaded();
       } catch (e) {
         failed.push(`${f.name}: ${(e as Error).message}`);
       }
     }
+    onUploaded();
     if (failed.length === 0) setMsg({ kind: "ok", text: `${ok.length}개 문서 등록됨 — 색인을 진행합니다. (${ok.join(", ")})` });
     else setMsg({ kind: "err", text: `${ok.length}개 성공 / ${failed.length}개 실패 — ${failed.join(" · ")}` });
     setFiles([]);

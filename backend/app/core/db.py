@@ -170,9 +170,14 @@ class BaseDatabase(ABC):
             row = self._exec(conn, "SELECT * FROM documents WHERE id=?", (doc_id,)).fetchone()
         return dict(row) if row else None
 
+    #: 목록 조회용 컬럼 — raw_text(원문 전체)는 제외한다. 문서가 커지면(예: PDF 수 MB)
+    #: `SELECT *` 는 매 폴링마다 원문 전체를 DB에서 끌어와 응답 지연/타임아웃을 유발한다.
+    _DOC_LIST_COLS = ("id, document_id, title, category, source, version, effective_date, updated_at, status, "
+                      "language, filename, content_type, processing_status, error_message, chunk_count, created_at, indexed_at")
+
     def list_documents(self) -> list[dict[str, Any]]:
         with self.connect() as conn:
-            rows = self._exec(conn, "SELECT * FROM documents ORDER BY created_at DESC").fetchall()
+            rows = self._exec(conn, f"SELECT {self._DOC_LIST_COLS} FROM documents ORDER BY created_at DESC").fetchall()
         return [dict(r) for r in rows]
 
     def delete_document(self, doc_id: str) -> bool:
