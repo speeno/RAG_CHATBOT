@@ -230,3 +230,64 @@ def test_golden_recall_at_5_offline(seeded, monkeypatch):
         if row["expected_document_id"] in {c.document_id for c in res.chunks}:
             ok += 1
     assert ok / len(golden) >= 0.9, f"Recall@5 {ok}/{len(golden)}"
+
+
+def test_feedback_multi_reason_and_escalate(seeded):
+    body = seeded.post("/api/chat", json={"message": "환불은 며칠 이내에 신청해야 하나요?"}).json()
+    r = seeded.post("/api/feedback", json={
+        "message_id": body["message_id"], "rating": "negative",
+        "reasons": ["답변이 틀렸어요", "설명이 부족해요"], "comment": "환불 수수료 안내가 없어요", "escalate": True,
+    })
+    assert r.status_code == 200 and r.json()["escalated"] is True
+    log = seeded.get(f"/api/logs/{body['message_id']}").json()
+    assert "답변이 틀렸어요, 설명이 부족해요" in log["feedback_reason"] and "의견: 환불 수수료" in log["feedback_reason"]
+    inq = seeded.get("/api/inquiries").json()
+    assert any(i["message_id"] == body["message_id"] and "피드백 전달" in i["content"] for i in inq)
+
+
+def test_pdf_upload_and_index(seeded):
+    from pypdf import PdfWriter
+    import io
+
+    w = PdfWriter()
+    w.add_blank_page(width=300, height=300)
+    buf = io.BytesIO(); w.write(buf)
+    # 빈 PDF(텍스트 없음) → 400
+    r = seeded.post("/api/knowledge", data={"sync": "true"}, files={"file": ("empty.pdf", buf.getvalue())})
+    assert r.status_code == 400
+    # 텍스트 스트림이 있는 최소 PDF 생성(xref 오프셋 계산 포함)
+    def make_pdf(text: str) -> bytes:
+        stream = f"BT /F1 12 Tf 10 150 Td ({text}) Tj ET".encode()
+        objs = [
+            b"<</Type/Catalog/Pages 2 0 R>>",
+            b"<</Type/Pages/Kids[3 0 R]/Count 1>>",
+            b"<</Type/Page/Parent 2 0 R/MediaBox[0 0 300 300]/Contents 4 0 R/Resources<</Font<</F1 5 0 R>>>>>>",
+            b"<</Length " + str(len(stream)).encode() + b">>stream\n" + stream + b"\nendstream",
+            b"<</Type/Font/Subtype/Type1/BaseFont/Helvetica>>",
+        ]
+        out = bytearray(b"%PDF-1.4\n")
+        offsets = []
+        for i, body in enumerate(objs, 1):
+            offsets.append(len(out))
+            out += f"{i} 0 obj".encode() + body + b"endobj\n"
+        xref_pos = len(out)
+        out += f"xref\n0 {len(objs)+1}\n0000000000 65535 f \n".encode()
+        for off in offsets:
+            out += f"{off:010d} 00000 n \n".encode()
+        out += f"trailer<</Size {len(objs)+1}/Root 1 0 R>>\nstartxref\n{xref_pos}\n%%EOF".encode()
+        return bytes(out)
+
+    pdf = make_pdf("Membership refund policy: within 14 days")
+    r = seeded.post("/api/knowledge", data={"sync": "true", "title": "멤버십 환불", "document_id": "MEMBER-001"},
+                    files={"file": ("membership.pdf", pdf)})
+    assert r.status_code == 201, r.text
+    doc = r.json()
+    assert doc["processing_status"] == "indexed" and doc["chunk_count"] >= 1
+    chunks = seeded.get(f"/api/knowledge/{doc['id']}/chunks").json()
+    assert any("Membership refund" in c["content"] for c in chunks)
+
+
+def test_admin_settings_endpoint(seeded):
+    s = seeded.get("/api/admin/settings").json()
+    assert s["retrieval"]["mode"] in ("hybrid", "dense") and s["storage"]["db_backend"] in ("sqlite", "postgres")
+    assert s["security"]["admin_auth"] is False and s["no_answer_message"].startswith("현재 등록된")

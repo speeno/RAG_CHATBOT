@@ -105,10 +105,10 @@ HTML 목업 보기: `docs/design/html/index.html`을 브라우저로 열거나, 
 | POST | `/api/chat` | 질문 → 답변+출처 (`conversation_id`로 멀티턴) |
 | POST | `/api/chat/stream` | SSE 스트리밍 (`meta → sources → delta* → done`) |
 | GET | `/api/conversations/{id}` | 대화 이력 |
-| POST | `/api/feedback` | 👍/👎 + 사유 |
+| POST | `/api/feedback` | 👍/👎 + 복수 사유·의견·상담원 전달(escalate→inquiries) |
 | GET | `/api/logs` | 상담 로그 목록 — `limit/offset/date_from/date_to/answerable/feedback/q` 필터 → `{items,total}` (`/admin/logs` 화면) |
 | GET | `/api/logs/{message_id}`, `/api/logs/export.csv` | 로그 상세 / 현재 필터 CSV 내보내기 |
-| GET/POST | `/api/knowledge` | 문서 목록 / 등록(multipart `file` 또는 `content`, 폼 필드가 front matter보다 우선) |
+| GET/POST | `/api/knowledge` | 문서 목록 / 등록(md·html·txt·**pdf**, 파일당 10MB, 폼 필드가 front matter보다 우선) |
 | GET/PATCH/DELETE | `/api/knowledge/{id}` | 상세(원문) / 상태·메타 수정 / 삭제 |
 | GET | `/api/knowledge/{id}/chunks` | 청크 목록 |
 | POST | `/api/knowledge/{id}/reindex` | 재색인 |
@@ -116,7 +116,7 @@ HTML 목업 보기: `docs/design/html/index.html`을 브라우저로 열거나, 
 | GET | `/api/stats/overview`, `/api/stats/unanswered` | 대시보드 KPI/추이/카테고리/피드백/주요 질문, 미답변 TOP N·추천·처리 상태 (`/admin`, `/admin/unanswered`) |
 | PATCH | `/api/stats/unanswered/{key}` | 미답변 질문 처리 상태/메모 |
 | POST/GET/PATCH | `/api/inquiries` | 상담원 연결·문의 접수(공개) / 목록·처리(관리자) |
-| GET | `/api/admin/me` | 관리자 토큰 검증 (`ADMIN_TOKEN` 설정 시 관리자 API는 `Authorization: Bearer`) |
+| GET | `/api/admin/me`, `/api/admin/settings` | 관리자 토큰 검증 / 런타임 설정 스냅샷(읽기 전용) (`ADMIN_TOKEN` 설정 시 관리자 API는 `Authorization: Bearer`) |
 | GET | `/api/health` | 프로바이더/임계값/색인 청크 수/`admin_auth` |
 
 ## 검색 품질 (Phase 2 구현됨)

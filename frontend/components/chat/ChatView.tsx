@@ -18,6 +18,29 @@ type Msg = { kind: "user"; id: string; text: string; time: string } | ({ kind: "
 
 const nowTime = () => new Date().toLocaleTimeString("ko-KR", { hour: "numeric", minute: "2-digit" });
 
+/** 상담 이력(/history)용: 이 브라우저에서 진행한 대화 목록을 localStorage 에 보관 */
+export const CONVERSATIONS_KEY = "rag.conversations";
+export type SavedConversation = { id: string; first_question: string; last_question: string; started_at: string; updated_at: string; turns: number };
+
+function saveConversation(id: string, question: string) {
+  try {
+    const list = JSON.parse(localStorage.getItem(CONVERSATIONS_KEY) ?? "[]") as SavedConversation[];
+    const now = new Date().toISOString();
+    const cur = list.find((c) => c.id === id);
+    if (cur) {
+      cur.last_question = question;
+      cur.updated_at = now;
+      cur.turns += 1;
+    } else {
+      list.unshift({ id, first_question: question, last_question: question, started_at: now, updated_at: now, turns: 1 });
+    }
+    list.sort((a, b) => (a.updated_at < b.updated_at ? 1 : -1));
+    localStorage.setItem(CONVERSATIONS_KEY, JSON.stringify(list.slice(0, 50)));
+  } catch {
+    /* storage 실패 무시 */
+  }
+}
+
 export function ChatView() {
   const [messages, setMessages] = useState<Msg[]>([]);
   const [input, setInput] = useState("");
@@ -33,6 +56,22 @@ export function ChatView() {
   useEffect(() => {
     listRef.current?.scrollTo({ top: listRef.current.scrollHeight, behavior: "smooth" });
   }, [messages]);
+
+  useEffect(() => {
+    const cid = new URLSearchParams(window.location.search).get("conversation");
+    if (!cid) return;
+    api.getConversation(cid).then((conv) => {
+      setConversationId(cid);
+      setMessages(conv.messages.map((m, i): Msg => {
+        const time = new Date(m.created_at).toLocaleTimeString("ko-KR", { hour: "numeric", minute: "2-digit" });
+        return m.role === "user"
+          ? { kind: "user", id: `h-u-${i}`, text: m.content, time }
+          : { kind: "bot", id: `h-b-${i}`, messageId: m.id, text: m.content, sources: m.sources, candidateSources: [], streaming: false,
+              done: { conversation_id: cid, message_id: m.id, answer: m.content, answerable: m.answerable ?? true, handoff: !(m.answerable ?? true),
+                      sources: m.sources, rewritten_query: null, timings: {}, model: null }, time };
+      }));
+    }).catch(() => { /* 만료/삭제된 대화 — 새 상담으로 시작 */ });
+  }, []);
 
   useEffect(() => {
     let alive = true;
@@ -84,6 +123,7 @@ export function ChatView() {
           onMeta: (m) => {
             setConversationId(m.conversation_id);
             updateBot(botId, { messageId: m.message_id });
+            saveConversation(m.conversation_id, q);
           },
           onSources: (s: Source[]) => updateBot(botId, { candidateSources: s }),
           onDelta: (t) => updateBot(botId, (m) => ({ text: m.text + t })),
@@ -105,10 +145,12 @@ export function ChatView() {
 
   const stop = () => abortRef.current?.abort();
 
-  const feedback = async (botId: string, messageId: string, rating: "positive" | "negative", reason?: string) => {
-    updateBot(botId, { feedback: rating, feedbackReason: reason });
+  const feedback = async (botId: string, messageId: string, rating: "positive" | "negative",
+                          detail?: { reasons?: string[]; comment?: string; escalate?: boolean }) => {
+    const label = detail?.reasons?.length ? detail.reasons.join(", ") : undefined;
+    updateBot(botId, { feedback: rating, feedbackReason: detail?.escalate ? `${label ?? ""}${label ? " · " : ""}상담원 전달됨` : label });
     try {
-      await api.feedback(messageId, rating, reason);
+      await api.feedback(messageId, rating, detail);
     } catch {
       /* 피드백 실패는 조용히 무시 */
     }
@@ -164,7 +206,7 @@ export function ChatView() {
               m.kind === "user" ? (
                 <UserMessage key={m.id} text={m.text} time={m.time} />
               ) : (
-                <BotMessage key={m.id} msg={m} onFeedback={(rating, reason) => m.messageId && feedback(m.id, m.messageId, rating, reason)} onAsk={send} />
+                <BotMessage key={m.id} msg={m} onFeedback={(rating, detail) => m.messageId && feedback(m.id, m.messageId, rating, detail)} onAsk={send} />
               ),
             )}
           </div>

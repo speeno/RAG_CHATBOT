@@ -8,6 +8,7 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, Uplo
 from fastapi.responses import StreamingResponse
 
 from app.api import schemas as S
+from app.core.config import NO_ANSWER_MESSAGE
 from app.core import stats as ST
 from app.core.services import Services
 
@@ -31,8 +32,8 @@ def require_admin(request: Request) -> None:
 
 admin = APIRouter(prefix="/api", dependencies=[Depends(require_admin)])
 
-MAX_UPLOAD_BYTES = 5 * 1024 * 1024
-ALLOWED_EXT = (".md", ".markdown", ".txt", ".html", ".htm")
+MAX_UPLOAD_BYTES = 10 * 1024 * 1024
+ALLOWED_EXT = (".md", ".markdown", ".txt", ".html", ".htm", ".pdf")
 
 
 def get_services(request: Request) -> Services:
@@ -79,10 +80,27 @@ def get_conversation(conversation_id: str, svc: Services = Depends(get_services)
 
 @router.post("/feedback")
 def feedback(req: S.FeedbackRequest, svc: Services = Depends(get_services)) -> dict[str, Any]:
-    ok = svc.db.set_feedback(req.message_id, req.rating, req.reason)
+    """피드백 저장(PRD §36). 복수 사유·추가 의견은 feedback_reason 한 컬럼에 사람이 읽을 수 있게 합친다.
+    `escalate=True` 면 상담원 확인용 문의(inquiries)로도 접수한다(목업 user/04 '상담원에게 전달')."""
+    parts = [r.strip() for r in (req.reasons or []) if r.strip()]
+    if req.reason and req.reason.strip() and req.reason.strip() not in parts:
+        parts.append(req.reason.strip())
+    reason_text = ", ".join(parts) if parts else None
+    if req.comment and req.comment.strip():
+        reason_text = (reason_text + " | 의견: " if reason_text else "의견: ") + req.comment.strip()
+    ok = svc.db.set_feedback(req.message_id, req.rating, reason_text)
     if not ok:
         raise HTTPException(404, "message not found")
-    return {"ok": True}
+    escalated = False
+    if req.escalate:
+        log = svc.db.get_turn_log(req.message_id)
+        content = f"[피드백 전달] 질문: {log['user_query'] if log else '-'}"
+        if reason_text:
+            content += f"\n사유: {reason_text}"
+        svc.db.add_inquiry(conversation_id=log["conversation_id"] if log else None, message_id=req.message_id,
+                           kind="inquiry", contact=None, content=content[:2000])
+        escalated = True
+    return {"ok": True, "escalated": escalated}
 
 
 def _log_filters(date_from: str | None, date_to: str | None, answerable: bool | None, feedback: str | None, q: str | None) -> dict[str, Any]:
@@ -180,11 +198,16 @@ async def upload_knowledge(
             raise HTTPException(400, f"지원하지 않는 형식입니다. 허용: {', '.join(ALLOWED_EXT)}")
         raw = await file.read()
         if len(raw) > MAX_UPLOAD_BYTES:
-            raise HTTPException(413, "파일이 너무 큽니다 (최대 5MB)")
-        try:
-            text = raw.decode("utf-8")
-        except UnicodeDecodeError:
-            text = raw.decode("cp949", errors="replace")
+            raise HTTPException(413, "파일이 너무 큽니다 (최대 10MB)")
+        if name.lower().endswith(".pdf"):
+            text = _pdf_to_text(raw)                     # PDF → 텍스트 추출(PRD §12: 가급적 Markdown 변환 권장)
+            if not text.strip():
+                raise HTTPException(400, "PDF에서 텍스트를 추출하지 못했습니다. 스캔본이면 텍스트 레이어가 필요합니다.")
+        else:
+            try:
+                text = raw.decode("utf-8")
+            except UnicodeDecodeError:
+                text = raw.decode("cp949", errors="replace")
     elif content:
         name = filename or "upload.md"
         text = content
@@ -254,6 +277,27 @@ def reindex_knowledge(doc_id: str, sync: bool = False, svc: Services = Depends(g
 def admin_me() -> dict[str, Any]:
     """토큰 검증용(프론트 로그인 게이트). 401이면 토큰 불일치."""
     return {"ok": True, "role": "admin"}
+
+
+@admin.get("/admin/settings")
+def admin_settings(svc: Services = Depends(get_services)) -> dict[str, Any]:
+    """런타임 설정 스냅샷(읽기 전용, 비밀 제외) — /admin/settings 화면."""
+    st = svc.settings
+    return {
+        "llm": {"provider": svc.llm.name, "anthropic_model": st.anthropic_model, "openai_model": st.openai_model,
+                 "effort": st.llm_effort, "max_tokens": st.llm_max_tokens},
+        "embedding": {"provider": svc.embedder.name, "voyage_model": st.voyage_model,
+                       "openai_model": st.openai_embedding_model},
+        "retrieval": {"mode": svc.retriever.mode, "top_k": st.top_k, "threshold": st.score_threshold,
+                       "candidates": st.retrieval_candidates, "rrf_k": st.rrf_k, "dense_weight": st.dense_weight,
+                       "multi_query": st.multi_query, "multi_query_n": st.multi_query_n, "reranker": svc.reranker.name,
+                       "max_context_chunks": st.max_context_chunks},
+        "chunking": {"max_chars": st.chunk_max_chars, "overlap_chars": st.chunk_overlap_chars},
+        "storage": {"db_backend": svc.db.name, "indexed_chunks": svc.store.size},
+        "security": {"admin_auth": bool(st.admin_token), "cors_origins": st.cors_origin_list,
+                      "cors_origin_regex": st.cors_origin_regex},
+        "no_answer_message": NO_ANSWER_MESSAGE,
+    }
 
 
 # ── stats (PRD §34 대시보드 · §35 미답변 분석) ─────────────────────
@@ -351,6 +395,24 @@ def search_test(req: S.SearchTestRequest, svc: Services = Depends(get_services))
         "hit": hit,
         "results": results,
     }
+
+
+def _pdf_to_text(raw: bytes) -> str:
+    import io
+
+    from pypdf import PdfReader
+
+    try:
+        reader = PdfReader(io.BytesIO(raw))
+    except Exception as e:  # noqa: BLE001
+        raise HTTPException(400, f"PDF 파싱 실패: {e}") from e
+    pages = []
+    for pg in reader.pages[:200]:
+        try:
+            pages.append(pg.extract_text() or "")
+        except Exception:  # noqa: BLE001 — 일부 페이지 실패는 건너뜀
+            pages.append("")
+    return "\n\n".join(pages)
 
 
 # ── helpers ─────────────────────────────────────────────────────

@@ -52,7 +52,10 @@ class ConversationOut(BaseModel):
 class FeedbackRequest(BaseModel):
     message_id: str
     rating: Literal["positive", "negative"]
-    reason: str | None = Field(default=None, max_length=500)
+    reason: str | None = Field(default=None, max_length=500)          # (하위 호환) 단일 사유
+    reasons: list[str] | None = Field(default=None, max_length=10)    # 복수 사유 (목업 user/04)
+    comment: str | None = Field(default=None, max_length=500)         # 추가 의견
+    escalate: bool = False                                            # 상담원에게 전달 → inquiries 접수
 
 
 class DocumentOut(BaseModel):

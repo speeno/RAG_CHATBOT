@@ -520,3 +520,53 @@ ul { list-style: none; }
 .gate-card code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; background: #eef1f6; padding: 1px 5px; border-radius: 4px; font-size: 12px; }
 .gate-bar { display: flex; justify-content: flex-end; align-items: center; gap: 14px; font-size: 12px; color: #6b7487; margin: -8px 0 10px; }
 .gate-bar .ico { width: 14px; height: 14px; vertical-align: -2px; margin-right: 4px; color: var(--green-text); }
+
+/* ── 피드백 확장(user/04) ─────────────────────────── */
+.fb-panel { margin-top: 10px; border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px; background: #fff; max-width: 560px; }
+.fb-panel .fb-q { font-size: 13.5px; font-weight: 600; color: var(--text); margin-bottom: 8px; }
+.fb-panel .fb-reasons { display: flex; flex-wrap: wrap; gap: 6px; }
+.fb-panel .fb-reasons button { height: 30px; padding: 0 12px; border-radius: 999px; border: 1px solid var(--border); background: #fff; font-size: 12.5px; color: #4b5566; }
+.fb-panel .fb-reasons button.on { background: var(--primary-soft); border-color: #b9c9f7; color: var(--primary-text); font-weight: 600; }
+.fb-panel .fb-comment { position: relative; margin-top: 10px; }
+.fb-panel .fb-comment .textarea { min-height: 56px; font-size: 13px; padding: 8px 12px 20px; }
+.fb-panel .fb-comment .cnt { position: absolute; right: 10px; bottom: 6px; font-size: 11px; }
+.fb-panel .fb-escalate { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text); margin-top: 10px; cursor: pointer; flex-wrap: wrap; }
+.fb-panel .fb-escalate input { width: 15px; height: 15px; accent-color: var(--primary); }
+.fb-panel .acts { display: flex; gap: 8px; margin-top: 10px; }
+
+/* ── 상담 이력(/history) ──────────────────────────── */
+.hist-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr); gap: 16px; align-items: start; }
+@media (max-width: 1100px) { .hist-grid { grid-template-columns: 1fr; } }
+.hist-list { padding: 10px; display: flex; flex-direction: column; gap: 6px; }
+.hist-item { display: flex; align-items: center; gap: 12px; width: 100%; text-align: left; padding: 10px 12px; border-radius: 12px; border: 1px solid transparent; background: none; }
+.hist-item:hover { background: #f8f9fc; }
+.hist-item.on { background: #f4f7ff; border-color: #c8d6fb; }
+.hist-item .b { flex: 1; min-width: 0; }
+.hist-item .t { font-size: 14px; font-weight: 600; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hist-item .s { font-size: 12px; margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hist-detail { padding: 16px 18px; }
+.hist-detail-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+.hist-detail .lg-conv .srcs { font-size: 11.5px; margin-top: 6px; }
+
+/* ── 도움말(/help) ────────────────────────────────── */
+.help-grid { display: flex; flex-direction: column; gap: 16px; max-width: 860px; }
+.help-grid h3 { font-size: 15.5px; font-weight: 700; color: var(--navy); margin-bottom: 8px; }
+.help-grid p { font-size: 13.5px; color: #4b5566; line-height: 1.7; }
+.help-steps { margin: 4px 0 0 18px; display: flex; flex-direction: column; gap: 8px; font-size: 13.5px; color: #4b5566; line-height: 1.6; }
+.help-faq dt { font-size: 13.5px; font-weight: 700; color: var(--text); margin-top: 12px; }
+.help-faq dt:first-child { margin-top: 0; }
+.help-faq dd { font-size: 13px; color: #4b5566; line-height: 1.65; margin-top: 4px; }
+
+/* ── 설정(/admin/settings) ────────────────────────── */
+.set-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 16px; }
+.set-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 7px 0; border-bottom: 1px dashed #edf0f5; font-size: 13px; }
+.set-row:last-child { border-bottom: 0; }
+.set-row .k { color: #6b7487; flex: none; }
+.set-row .v { color: var(--text); font-weight: 600; text-align: right; min-width: 0; overflow-wrap: anywhere; }
+.set-mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11.5px; font-weight: 500; }
+
+/* ── 지식베이스 문서 검색(N9) ─────────────────────── */
+.kb-search { display: inline-flex; align-items: center; gap: 8px; height: 34px; border: 1px solid #dfe3ea; border-radius: 9px; background: #fff; padding: 0 4px 0 10px; margin-left: auto; min-width: 240px; }
+.kb-search .ico { width: 15px; height: 15px; color: #8a94a6; flex: none; }
+.kb-search input { border: 0; outline: none; font-size: 13px; color: var(--text); flex: 1; min-width: 0; background: transparent; }
+.kb-search .icon-btn { width: 26px; height: 26px; }

@@ -5,6 +5,7 @@ import { api, type ChunkItem, type DocumentItem } from "@/lib/api";
 import { Icon } from "@/components/Icon";
 
 const STEPS = ["uploaded", "parsing", "chunking", "embedding", "indexed"] as const;
+const STEP_PCT: Record<DocumentItem["processing_status"], number> = { uploaded: 10, parsing: 35, chunking: 55, embedding: 80, indexed: 100, error: 0 };
 const STEP_LABEL: Record<DocumentItem["processing_status"], string> = {
   uploaded: "업로드됨", parsing: "파싱 중", chunking: "청킹 중", embedding: "임베딩 중", indexed: "색인 완료", error: "오류",
 };
@@ -20,7 +21,7 @@ function ProcStatus({ d }: { d: DocumentItem }) {
           <i key={s} className={isErr ? "err" : done ? "ok" : i < idx ? "on" : ""} />
         ))}
       </span>
-      <span className={`badge ${isErr ? "red" : done ? "green" : "blue"}`}>{STEP_LABEL[d.processing_status]}</span>
+      <span className={`badge ${isErr ? "red" : done ? "green" : "blue"}`}>{STEP_LABEL[d.processing_status]}{!done && !isErr ? ` ${STEP_PCT[d.processing_status]}%` : ""}</span>
       {!done && !isErr && <span className="spinner" />}
     </span>
   );
@@ -32,6 +33,7 @@ export function KnowledgeView() {
   const [selected, setSelected] = useState<DocumentItem | null>(null);
   const [chunks, setChunks] = useState<ChunkItem[] | null>(null);
   const [filter, setFilter] = useState<"all" | "active" | "inactive" | "error">("all");
+  const [q, setQ] = useState("");
 
   const load = useCallback(async () => {
     try {
@@ -60,9 +62,11 @@ export function KnowledgeView() {
     api.getChunks(selected.id).then(setChunks).catch(() => setChunks([]));
   }, [selected]);
 
-  const filtered = (docs ?? []).filter((d) =>
-    filter === "all" ? true : filter === "error" ? d.processing_status === "error" : d.status === filter,
-  );
+  const needle = q.trim().toLowerCase();
+  const filtered = (docs ?? [])
+    .filter((d) => (filter === "all" ? true : filter === "error" ? d.processing_status === "error" : d.status === filter))
+    .filter((d) => !needle || [d.title, d.document_id, d.category, d.filename, d.version]
+      .some((v) => (v ?? "").toLowerCase().includes(needle)));
   const counts = {
     all: docs?.length ?? 0,
     active: docs?.filter((d) => d.status === "active").length ?? 0,
@@ -99,6 +103,11 @@ export function KnowledgeView() {
                 {{ all: "전체", active: "활성", inactive: "비활성", error: "오류" }[k]} <b>{counts[k]}</b>
               </button>
             ))}
+            <div className="kb-search">
+              <Icon name="search" />
+              <input placeholder="문서명, ID, 카테고리, 파일명 검색" value={q} onChange={(e) => setQ(e.target.value)} />
+              {q && <button className="icon-btn" onClick={() => setQ("")} title="지우기"><Icon name="x" /></button>}
+            </div>
           </div>
           <div className="card">
             <div className="table-wrap">
@@ -113,7 +122,7 @@ export function KnowledgeView() {
                     <tr><td colSpan={8}><div className="empty-state"><span className="spinner" /> 불러오는 중…</div></td></tr>
                   )}
                   {docs !== null && filtered.length === 0 && (
-                    <tr><td colSpan={8}><div className="empty-state">등록된 문서가 없습니다. 오른쪽에서 Markdown/HTML 문서를 업로드하세요.</div></td></tr>
+                    <tr><td colSpan={8}><div className="empty-state">{needle ? `'${q}' 검색 결과가 없습니다.` : "등록된 문서가 없습니다. 오른쪽에서 Markdown/HTML/PDF 문서를 업로드하세요."}</div></td></tr>
                   )}
                   {filtered.map((d) => (
                     <tr key={d.id} className={selected?.id === d.id ? "selected" : ""} onClick={() => setSelected(selected?.id === d.id ? null : d)} style={{ cursor: "pointer" }}>
@@ -169,7 +178,7 @@ export function KnowledgeView() {
 }
 
 function UploadForm({ onUploaded }: { onUploaded: () => void }) {
-  const [file, setFile] = useState<File | null>(null);
+  const [files, setFiles] = useState<File[]>([]);
   const [over, setOver] = useState(false);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<{ kind: "ok" | "err"; text: string } | null>(null);
@@ -183,52 +192,63 @@ function UploadForm({ onUploaded }: { onUploaded: () => void }) {
     if (q) setSuggest(q);
   }, []);
 
-  const pick = (f: File | null) => {
-    setFile(f);
+  const pick = (fl: FileList | File[] | null) => {
+    const arr = Array.from(fl ?? []);
+    setFiles(arr);
     setMsg(null);
-    if (f && !meta.title) setMeta((m) => ({ ...m, title: f.name.replace(/\.[^.]+$/, "") }));
+    if (arr.length === 1 && !meta.title) setMeta((m) => ({ ...m, title: arr[0].name.replace(/\.[^.]+$/, "") }));
   };
 
   const submit = async () => {
-    if (!file) return;
+    if (files.length === 0) return;
     setBusy(true);
     setMsg(null);
-    try {
-      const form = new FormData();
-      form.append("file", file);
-      Object.entries(meta).forEach(([k, v]) => v && form.append(k, v));
-      const doc = await api.uploadDocument(form);
-      setMsg({ kind: "ok", text: `'${doc.title}' 등록됨 — 색인을 진행합니다.` });
-      setFile(null);
-      setMeta({ title: "", document_id: "", category: "", version: "", effective_date: "" });
-      if (inputRef.current) inputRef.current.value = "";
-      onUploaded();
-    } catch (e) {
-      setMsg({ kind: "err", text: (e as Error).message });
-    } finally {
-      setBusy(false);
+    const multi = files.length > 1;   // 여러 파일이면 문서명/ID 폼 값은 무시(파일별 front matter/파일명 사용)
+    const ok: string[] = [];
+    const failed: string[] = [];
+    for (const f of files) {
+      try {
+        const form = new FormData();
+        form.append("file", f);
+        Object.entries(meta).forEach(([k, v]) => {
+          if (!v) return;
+          if (multi && (k === "title" || k === "document_id")) return;
+          form.append(k, v);
+        });
+        const doc = await api.uploadDocument(form);
+        ok.push(doc.title);
+        onUploaded();
+      } catch (e) {
+        failed.push(`${f.name}: ${(e as Error).message}`);
+      }
     }
+    if (failed.length === 0) setMsg({ kind: "ok", text: `${ok.length}개 문서 등록됨 — 색인을 진행합니다. (${ok.join(", ")})` });
+    else setMsg({ kind: "err", text: `${ok.length}개 성공 / ${failed.length}개 실패 — ${failed.join(" · ")}` });
+    setFiles([]);
+    setMeta({ title: "", document_id: "", category: "", version: "", effective_date: "" });
+    if (inputRef.current) inputRef.current.value = "";
+    setBusy(false);
   };
 
   return (
     <div className="card upload-card">
       <h2>문서 업로드</h2>
-      <div className="sub">Markdown(.md) 권장 · HTML(.html) 지원 · 최대 5MB. front matter(document_id, title, category, version…)가 있으면 자동으로 읽습니다.</div>
+      <div className="sub">Markdown(.md) 권장 · HTML/TXT/PDF 지원 · 파일당 최대 10MB · 여러 파일 선택 가능. front matter(document_id, title, category, version…)가 있으면 자동으로 읽습니다.</div>
       <div
         className={`drop ${over ? "over" : ""}`}
         onClick={() => inputRef.current?.click()}
         onDragOver={(e) => { e.preventDefault(); setOver(true); }}
         onDragLeave={() => setOver(false)}
-        onDrop={(e) => { e.preventDefault(); setOver(false); pick(e.dataTransfer.files?.[0] ?? null); }}
+        onDrop={(e) => { e.preventDefault(); setOver(false); pick(e.dataTransfer.files); }}
       >
         <div className="cloud"><Icon name="cloud-upload" /></div>
         <div className="t1">파일을 드래그 &amp; 드롭하거나 클릭하여 선택하세요</div>
-        <div className="t2">Markdown, HTML, TXT 파일을 지원합니다.</div>
-        {file && <div className="file">{file.name} ({Math.round(file.size / 1024)} KB)</div>}
-        <input ref={inputRef} type="file" accept=".md,.markdown,.txt,.html,.htm" hidden onChange={(e) => pick(e.target.files?.[0] ?? null)} />
+        <div className="t2">Markdown, HTML, TXT, PDF 파일을 지원합니다. (PDF는 텍스트 레이어 필요)</div>
+        {files.length > 0 && <div className="file">{files.length === 1 ? `${files[0].name} (${Math.round(files[0].size / 1024)} KB)` : `${files.length}개 파일 선택됨 (${files.map((f) => f.name).join(", ")})`}</div>}
+        <input ref={inputRef} type="file" multiple accept=".md,.markdown,.txt,.html,.htm,.pdf" hidden onChange={(e) => pick(e.target.files)} />
       </div>
       <div className="f-grid">
-        <div className="full"><label className="field-label">문서명</label><input className="input" value={meta.title} onChange={(e) => setMeta({ ...meta, title: e.target.value })} placeholder="예) 환불 및 교환 정책 안내 (비우면 front matter/파일명 사용)" /></div>
+        <div className="full"><label className="field-label">문서명 {files.length > 1 && <small className="muted">(여러 파일: 파일별 front matter/파일명 사용)</small>}</label><input className="input" disabled={files.length > 1} value={meta.title} onChange={(e) => setMeta({ ...meta, title: e.target.value })} placeholder="예) 환불 및 교환 정책 안내 (비우면 front matter/파일명 사용)" /></div>
         <div><label className="field-label">문서 ID</label><input className="input" value={meta.document_id} onChange={(e) => setMeta({ ...meta, document_id: e.target.value })} placeholder="REFUND-001" /></div>
         <div><label className="field-label">카테고리</label><input className="input" value={meta.category} onChange={(e) => setMeta({ ...meta, category: e.target.value })} placeholder="customer_service" /></div>
         <div><label className="field-label">버전</label><input className="input" value={meta.version} onChange={(e) => setMeta({ ...meta, version: e.target.value })} placeholder="1.0" /></div>
@@ -241,7 +261,7 @@ function UploadForm({ onUploaded }: { onUploaded: () => void }) {
       )}
       {msg && <div className={`alert ${msg.kind === "ok" ? "warn" : "error"}`} style={{ marginTop: 12, ...(msg.kind === "ok" ? { background: "var(--green-bg)", color: "#0f6f55", borderColor: "#bfead9" } : {}) }}><Icon name={msg.kind === "ok" ? "check-circle" : "alert-circle"} /> {msg.text}</div>}
       <div className="f-btns">
-        <button className="btn primary" disabled={!file || busy} onClick={submit}>
+        <button className="btn primary" disabled={files.length === 0 || busy} onClick={submit}>
           {busy ? <span className="spinner" style={{ borderTopColor: "#fff" }} /> : <Icon name="cloud-upload" />} 업로드 시작
         </button>
       </div>

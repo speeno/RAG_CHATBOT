@@ -52,10 +52,13 @@ export function BotMessage({
   onAsk,
 }: {
   msg: BotMsg;
-  onFeedback: (rating: "positive" | "negative", reason?: string) => void;
+  onFeedback: (rating: "positive" | "negative", detail?: { reasons?: string[]; comment?: string; escalate?: boolean }) => void;
   onAsk: (q: string) => void;
 }) {
   const [showReasons, setShowReasons] = useState(false);
+  const [fbReasons, setFbReasons] = useState<string[]>([]);
+  const [fbComment, setFbComment] = useState("");
+  const [fbEscalate, setFbEscalate] = useState(false);
   const [inq, setInq] = useState<{ kind: "inquiry" | "agent"; contact: string; content: string; busy: boolean; done: boolean; error: string | null } | null>(null);
   const done = msg.done;
   const failClosed = done ? !done.answerable : false;
@@ -165,10 +168,30 @@ export function BotMessage({
           </div>
         )}
         {showReasons && !msg.feedback && (
-          <div className="fb-reasons">
-            {NEG_REASONS.map((r) => (
-              <button key={r} onClick={() => { onFeedback("negative", r); setShowReasons(false); }}>{r}</button>
-            ))}
+          <div className="fb-panel">
+            <div className="fb-q">어떤 점이 부족했나요? <small className="muted">여러 항목을 선택할 수 있습니다.</small></div>
+            <div className="fb-reasons">
+              {NEG_REASONS.map((r) => (
+                <button key={r} className={fbReasons.includes(r) ? "on" : ""}
+                  onClick={() => setFbReasons((prev) => (prev.includes(r) ? prev.filter((x) => x !== r) : [...prev, r]))}>{r}</button>
+              ))}
+            </div>
+            <div className="fb-comment">
+              <textarea className="textarea" rows={2} maxLength={500} placeholder="추가 의견 (선택) — 자세한 의견을 입력해 주세요."
+                value={fbComment} onChange={(e) => setFbComment(e.target.value)} />
+              <span className="cnt muted">{fbComment.length} / 500</span>
+            </div>
+            <label className="fb-escalate">
+              <input type="checkbox" checked={fbEscalate} onChange={(e) => setFbEscalate(e.target.checked)} />
+              상담원에게 전달 <small className="muted">— 상담원이 내용을 확인하고 필요한 조치를 진행합니다.</small>
+            </label>
+            <div className="acts">
+              <button className="btn sm primary" disabled={fbReasons.length === 0 && !fbComment.trim()}
+                onClick={() => { onFeedback("negative", { reasons: fbReasons, comment: fbComment.trim() || undefined, escalate: fbEscalate }); setShowReasons(false); }}>
+                피드백 제출
+              </button>
+              <button className="btn sm" onClick={() => setShowReasons(false)}>취소</button>
+            </div>
           </div>
         )}
       </div>

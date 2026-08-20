@@ -8,6 +8,8 @@ import { Icon } from "./Icon";
 
 const USER_NAV = [
   { href: "/", label: "상담하기", icon: "chat" },
+  { href: "/history", label: "상담 이력", icon: "history" },
+  { href: "/help", label: "도움말", icon: "help" },
 ];
 const ADMIN_NAV = [
   { href: "/admin", label: "대시보드", icon: "line-chart" },
@@ -15,6 +17,7 @@ const ADMIN_NAV = [
   { href: "/admin/search-test", label: "검색 테스트", icon: "search" },
   { href: "/admin/logs", label: "상담 로그", icon: "user-log" },
   { href: "/admin/unanswered", label: "미답변 분석", icon: "help" },
+  { href: "/admin/settings", label: "설정", icon: "settings" },
 ];
 
 export function Sidebar() {

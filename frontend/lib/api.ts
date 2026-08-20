@@ -152,6 +152,16 @@ export type Inquiry = { id: string; conversation_id: string | null; message_id: 
 
 export type StatsQuery = { date_from?: string; date_to?: string; tz_offset?: number };
 
+export type AdminSettings = {
+  llm: { provider: string; anthropic_model: string; openai_model: string; effort: string; max_tokens: number };
+  embedding: { provider: string; voyage_model: string; openai_model: string };
+  retrieval: { mode: string; top_k: number; threshold: number; candidates: number; rrf_k: number; dense_weight: number; multi_query: boolean; multi_query_n: number; reranker: string; max_context_chunks: number };
+  chunking: { max_chars: number; overlap_chars: number };
+  storage: { db_backend: string; indexed_chunks: number };
+  security: { admin_auth: boolean; cors_origins: string[]; cors_origin_regex: string | null };
+  no_answer_message: string;
+};
+
 export type Health = {
   status: string;
   db_backend: string;
@@ -230,6 +240,7 @@ export const api = {
   health: () => fetchWithRetry(`${API_URL}/api/health`, { cache: "no-store" }, 2, 800).then(j<Health>),
 
   adminMe: () => f(`${API_URL}/api/admin/me`, { cache: "no-store" }).then(j<{ ok: boolean; role: string }>),
+  adminSettings: () => f(`${API_URL}/api/admin/settings`, { cache: "no-store" }).then(j<AdminSettings>),
   downloadLogsCsv: async (q: LogsQuery) => {
     const res = await f(`${API_URL}/api/logs/export.csv?${logsQueryString(q)}`);
     if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
@@ -268,12 +279,12 @@ export const api = {
       body: JSON.stringify({ message, conversation_id: conversation_id ?? null }),
     }).then(j<ChatResponse>),
 
-  feedback: (message_id: string, rating: "positive" | "negative", reason?: string) =>
+  feedback: (message_id: string, rating: "positive" | "negative", detail?: { reasons?: string[]; comment?: string; escalate?: boolean }) =>
     f(`${API_URL}/api/feedback`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ message_id, rating, reason }),
-    }).then(j<{ ok: boolean }>),
+      body: JSON.stringify({ message_id, rating, ...detail }),
+    }).then(j<{ ok: boolean; escalated: boolean }>),
 
   listDocuments: () => f(`${API_URL}/api/knowledge`, { cache: "no-store" }).then(j<DocumentItem[]>),
   getChunks: (id: string) => f(`${API_URL}/api/knowledge/${id}/chunks`, { cache: "no-store" }).then(j<ChunkItem[]>),
