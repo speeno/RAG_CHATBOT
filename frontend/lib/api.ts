@@ -192,8 +192,28 @@ export type DocumentItem = {
   processing_status: "uploaded" | "parsing" | "chunking" | "embedding" | "indexed" | "error";
   error_message: string | null;
   chunk_count: number;
+  tags: string[];
+  access_level: "public" | "internal";
   created_at: string;
   indexed_at: string | null;
+};
+
+export type Category = { name: string; description: string | null; doc_count: number; registered: boolean };
+export type Tag = { name: string; doc_count: number };
+
+export type MonitoringJob = {
+  id: string; title: string; document_id: string; category: string | null;
+  processing_status: DocumentItem["processing_status"]; error_message: string | null;
+  chunk_count: number; created_at: string; indexed_at: string | null; elapsed_s: number | null;
+  status: "active" | "inactive"; access_level: "public" | "internal";
+};
+
+export type Monitoring = {
+  summary: { total: number; indexed: number; processing: number; error: number };
+  jobs: MonitoringJob[];
+  system: Health;
+  uptime_s: number;
+  open_inquiries: number;
 };
 
 export type ChunkItem = {
@@ -240,6 +260,19 @@ export const api = {
   health: () => fetchWithRetry(`${API_URL}/api/health`, { cache: "no-store" }, 2, 800).then(j<Health>),
 
   adminMe: () => f(`${API_URL}/api/admin/me`, { cache: "no-store" }).then(j<{ ok: boolean; role: string }>),
+  listCategories: () => f(`${API_URL}/api/categories`, { cache: "no-store" }).then(j<Category[]>),
+  createCategory: (name: string, description?: string | null) =>
+    f(`${API_URL}/api/categories`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name, description }) }).then(j<Category>),
+  patchCategory: (name: string, body: { new_name?: string; description?: string | null }) =>
+    f(`${API_URL}/api/categories/${encodeURIComponent(name)}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }).then(j<{ ok: boolean; documents_updated: number }>),
+  deleteCategory: (name: string, reassignTo?: string | null) =>
+    f(`${API_URL}/api/categories/${encodeURIComponent(name)}${reassignTo ? `?reassign_to=${encodeURIComponent(reassignTo)}` : ""}`, { method: "DELETE" }).then(j<{ ok: boolean; documents_updated: number }>),
+  listTags: () => f(`${API_URL}/api/tags`, { cache: "no-store" }).then(j<Tag[]>),
+  renameTag: (name: string, newName: string) =>
+    f(`${API_URL}/api/tags/${encodeURIComponent(name)}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ new_name: newName }) }).then(j<{ ok: boolean; documents_updated: number }>),
+  deleteTag: (name: string) => f(`${API_URL}/api/tags/${encodeURIComponent(name)}`, { method: "DELETE" }).then(j<{ ok: boolean; documents_updated: number }>),
+  monitoring: () => f(`${API_URL}/api/admin/monitoring`, { cache: "no-store" }).then(j<Monitoring>),
+
   adminSettings: () => f(`${API_URL}/api/admin/settings`, { cache: "no-store" }).then(j<AdminSettings>),
   downloadLogsCsv: async (q: LogsQuery) => {
     const res = await f(`${API_URL}/api/logs/export.csv?${logsQueryString(q)}`);
@@ -265,7 +298,7 @@ export const api = {
   getLog: (messageId: string) => f(`${API_URL}/api/logs/${messageId}`, { cache: "no-store" }).then(j<TurnLog>),
   getConversation: (id: string) => f(`${API_URL}/api/conversations/${id}`, { cache: "no-store" }).then(j<ConversationOut>),
 
-  searchTest: (body: { query: string; top_k?: number; previous_query?: string | null; expected_document_id?: string | null; use_multi_query?: boolean }) =>
+  searchTest: (body: { query: string; top_k?: number; previous_query?: string | null; expected_document_id?: string | null; use_multi_query?: boolean; include_internal?: boolean }) =>
     f(`${API_URL}/api/search/test`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -292,7 +325,7 @@ export const api = {
   uploadDocument: (form: FormData) => f(`${API_URL}/api/knowledge`, { method: "POST", body: form }).then(j<DocumentItem>),
   deleteDocument: (id: string) => f(`${API_URL}/api/knowledge/${id}`, { method: "DELETE" }).then(j<void>),
   reindexDocument: (id: string) => f(`${API_URL}/api/knowledge/${id}/reindex`, { method: "POST" }).then(j<DocumentItem>),
-  patchDocument: (id: string, patch: Partial<Pick<DocumentItem, "status" | "title" | "category" | "version">>) =>
+  patchDocument: (id: string, patch: Partial<Pick<DocumentItem, "status" | "title" | "category" | "version" | "tags" | "access_level">>) =>
     f(`${API_URL}/api/knowledge/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },

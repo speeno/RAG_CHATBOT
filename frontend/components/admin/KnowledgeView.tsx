@@ -75,7 +75,7 @@ export function KnowledgeView() {
   const needle = q.trim().toLowerCase();
   const filtered = (docs ?? [])
     .filter((d) => (filter === "all" ? true : filter === "error" ? d.processing_status === "error" : d.status === filter))
-    .filter((d) => !needle || [d.title, d.document_id, d.category, d.filename, d.version]
+    .filter((d) => !needle || [d.title, d.document_id, d.category, d.filename, d.version, d.tags.join(" ")]
       .some((v) => (v ?? "").toLowerCase().includes(needle)));
   const counts = {
     all: docs?.length ?? 0,
@@ -192,7 +192,7 @@ function UploadForm({ onUploaded }: { onUploaded: () => void }) {
   const [over, setOver] = useState(false);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<{ kind: "ok" | "err"; text: string } | null>(null);
-  const [meta, setMeta] = useState({ title: "", document_id: "", category: "", version: "", effective_date: "" });
+  const [meta, setMeta] = useState({ title: "", document_id: "", category: "", version: "", effective_date: "", tags: "", access_level: "" });
   const [suggest, setSuggest] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -235,7 +235,7 @@ function UploadForm({ onUploaded }: { onUploaded: () => void }) {
     if (failed.length === 0) setMsg({ kind: "ok", text: `${ok.length}개 문서 등록됨 — 색인을 진행합니다. (${ok.join(", ")})` });
     else setMsg({ kind: "err", text: `${ok.length}개 성공 / ${failed.length}개 실패 — ${failed.join(" · ")}` });
     setFiles([]);
-    setMeta({ title: "", document_id: "", category: "", version: "", effective_date: "" });
+    setMeta({ title: "", document_id: "", category: "", version: "", effective_date: "", tags: "", access_level: "" });
     if (inputRef.current) inputRef.current.value = "";
     setBusy(false);
   };
@@ -263,6 +263,8 @@ function UploadForm({ onUploaded }: { onUploaded: () => void }) {
         <div><label className="field-label">카테고리</label><input className="input" value={meta.category} onChange={(e) => setMeta({ ...meta, category: e.target.value })} placeholder="customer_service" /></div>
         <div><label className="field-label">버전</label><input className="input" value={meta.version} onChange={(e) => setMeta({ ...meta, version: e.target.value })} placeholder="1.0" /></div>
         <div><label className="field-label">시행일</label><input className="input" type="date" value={meta.effective_date} onChange={(e) => setMeta({ ...meta, effective_date: e.target.value })} /></div>
+        <div><label className="field-label">태그 <small className="muted">(쉼표 구분)</small></label><input className="input" value={meta.tags} onChange={(e) => setMeta({ ...meta, tags: e.target.value })} placeholder="환불, VIP" /></div>
+        <div><label className="field-label">접근 레벨</label><select className="input" value={meta.access_level} onChange={(e) => setMeta({ ...meta, access_level: e.target.value })}><option value="">public (기본)</option><option value="internal">internal (내부 전용)</option></select></div>
       </div>
       {suggest && (
         <div className="alert warn" style={{ marginTop: 12, fontSize: 13 }}>

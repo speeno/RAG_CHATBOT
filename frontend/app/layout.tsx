@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
-import { Sidebar } from "@/components/Sidebar";
-import { Topbar } from "@/components/Topbar";
+import { Shell } from "@/components/Shell";
 
 export const metadata: Metadata = {
   title: "AI 상담 도우미",
@@ -12,11 +11,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="ko">
       <body>
-        <div className="app">
-          <Sidebar />
-          <Topbar />
-          <main className="main">{children}</main>
-        </div>
+        <Shell>{children}</Shell>
       </body>
     </html>
   );

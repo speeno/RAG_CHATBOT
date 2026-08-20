@@ -109,7 +109,9 @@ HTML 목업 보기: `docs/design/html/index.html`을 브라우저로 열거나, 
 | GET | `/api/logs` | 상담 로그 목록 — `limit/offset/date_from/date_to/answerable/feedback/q` 필터 → `{items,total}` (`/admin/logs` 화면) |
 | GET | `/api/logs/{message_id}`, `/api/logs/export.csv` | 로그 상세 / 현재 필터 CSV 내보내기 |
 | GET/POST | `/api/knowledge` | 문서 목록 / 등록(md·html·txt·**pdf**, 파일당 10MB, 폼 필드가 front matter보다 우선) |
-| GET/PATCH/DELETE | `/api/knowledge/{id}` | 상세(원문) / 상태·메타 수정 / 삭제 |
+| GET/PATCH/DELETE | `/api/knowledge/{id}` | 상세(원문) / 상태·메타·태그·접근레벨 수정 / 삭제 |
+| GET/POST/PATCH/DELETE | `/api/categories*`, `/api/tags*` | 분류 관리 — 이름 변경/삭제 시 문서 일괄 반영 (`/admin/taxonomy`) |
+| GET | `/api/admin/monitoring` | 색인 작업·시스템 상태 (`/admin/monitoring`) |
 | GET | `/api/knowledge/{id}/chunks` | 청크 목록 |
 | POST | `/api/knowledge/{id}/reindex` | 재색인 |
 | POST | `/api/search/test` | 검색 테스트(정규화·Rewrite·임계값 판정·정답 문서 Hit·청크) — `/admin/search-test` 화면 |
@@ -128,4 +130,4 @@ HTML 목업 보기: `docs/design/html/index.html`을 브라우저로 열거나, 
 
 ## 다음 단계 (Phase 3~4 잔여)
 
-화면 현황: [docs/screens-todo.md](docs/screens-todo.md) (목업 10개 전부 구현). 남은 것: RBAC(역할·문서별 권한), 문서 버전 관리, PII 마스킹, 플로팅 위젯, Agent-assist.
+화면 현황: [docs/screens-todo.md](docs/screens-todo.md) (목업 10개 전부 구현). 문서별 접근 레벨(public/internal, 검색 단계 필터)·분류 관리·모니터링·`/embed`(사용자 전용 상담 경로)까지 구현됨. 남은 것: 역할 기반 RBAC, 문서 버전 관리, PII 마스킹, 플로팅 위젯, Agent-assist.

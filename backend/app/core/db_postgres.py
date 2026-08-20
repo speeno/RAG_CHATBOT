@@ -34,6 +34,8 @@ POSTGRES_SCHEMA = [
       processing_status TEXT NOT NULL DEFAULT 'uploaded',
       error_message TEXT,
       chunk_count INTEGER DEFAULT 0,
+      tags TEXT,
+      access_level TEXT DEFAULT 'public',
       created_at TEXT NOT NULL,
       indexed_at TEXT
     )
@@ -98,6 +100,15 @@ POSTGRES_SCHEMA = [
     "ALTER TABLE turn_logs ADD COLUMN IF NOT EXISTS seq BIGSERIAL",
     "ALTER TABLE messages ADD COLUMN IF NOT EXISTS seq BIGSERIAL",
     "CREATE INDEX IF NOT EXISTS idx_turn_logs_created ON turn_logs(created_at)",
+    "ALTER TABLE documents ADD COLUMN IF NOT EXISTS tags TEXT",
+    "ALTER TABLE documents ADD COLUMN IF NOT EXISTS access_level TEXT DEFAULT 'public'",
+    """
+    CREATE TABLE IF NOT EXISTS categories (
+      name TEXT PRIMARY KEY,
+      description TEXT,
+      created_at TEXT NOT NULL
+    )
+    """,
     """
     CREATE TABLE IF NOT EXISTS unanswered_reviews (
       question_key TEXT PRIMARY KEY,
@@ -121,7 +132,7 @@ POSTGRES_SCHEMA = [
     """,
 ]
 
-TABLES = ("inquiries", "unanswered_reviews", "turn_logs", "messages", "conversations", "chunks", "documents")
+TABLES = ("inquiries", "unanswered_reviews", "categories", "turn_logs", "messages", "conversations", "chunks", "documents")
 
 
 class PostgresDatabase(BaseDatabase):

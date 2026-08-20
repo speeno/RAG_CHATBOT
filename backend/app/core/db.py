@@ -37,10 +37,18 @@ CREATE TABLE IF NOT EXISTS documents (
   processing_status TEXT NOT NULL DEFAULT 'uploaded', -- uploaded|parsing|chunking|embedding|indexed|error
   error_message TEXT,
   chunk_count INTEGER DEFAULT 0,
+  tags TEXT,                                      -- JSON array (예: ["환불","VIP"])
+  access_level TEXT DEFAULT 'public',             -- public | internal — 검색 단계 필터(PRD §29)
   created_at TEXT NOT NULL,
   indexed_at TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_documents_document_id ON documents(document_id);
+
+CREATE TABLE IF NOT EXISTS categories (
+  name TEXT PRIMARY KEY,
+  description TEXT,
+  created_at TEXT NOT NULL
+);
 
 CREATE TABLE IF NOT EXISTS chunks (
   id TEXT PRIMARY KEY,
@@ -165,20 +173,107 @@ class BaseDatabase(ABC):
         with self.connect() as conn:
             self._exec(conn, f"UPDATE documents SET {sets} WHERE id=?", [*fields.values(), doc_id])
 
+    @staticmethod
+    def _parse_doc(d: dict[str, Any]) -> dict[str, Any]:
+        d.pop("seq", None)
+        d["tags"] = json.loads(d["tags"]) if d.get("tags") else []
+        d["access_level"] = d.get("access_level") or "public"
+        return d
+
     def get_document(self, doc_id: str) -> dict[str, Any] | None:
         with self.connect() as conn:
             row = self._exec(conn, "SELECT * FROM documents WHERE id=?", (doc_id,)).fetchone()
-        return dict(row) if row else None
+        return self._parse_doc(dict(row)) if row else None
 
     #: 목록 조회용 컬럼 — raw_text(원문 전체)는 제외한다. 문서가 커지면(예: PDF 수 MB)
     #: `SELECT *` 는 매 폴링마다 원문 전체를 DB에서 끌어와 응답 지연/타임아웃을 유발한다.
     _DOC_LIST_COLS = ("id, document_id, title, category, source, version, effective_date, updated_at, status, "
-                      "language, filename, content_type, processing_status, error_message, chunk_count, created_at, indexed_at")
+                      "language, filename, content_type, processing_status, error_message, chunk_count, tags, access_level, created_at, indexed_at")
 
     def list_documents(self) -> list[dict[str, Any]]:
         with self.connect() as conn:
             rows = self._exec(conn, f"SELECT {self._DOC_LIST_COLS} FROM documents ORDER BY created_at DESC").fetchall()
-        return [dict(r) for r in rows]
+        return [self._parse_doc(dict(r)) for r in rows]
+
+    # ── categories (N4) ──────────────────────────────────────────
+    def list_categories(self) -> list[dict[str, Any]]:
+        """등록된 카테고리(categories 테이블) + 문서에서 실제 사용 중인 카테고리를 합쳐 문서 수와 함께 반환."""
+        with self.connect() as conn:
+            regs = self._exec(conn, "SELECT name, description FROM categories").fetchall()
+            counts = self._exec(conn, "SELECT category AS name, COUNT(*) AS n FROM documents WHERE category IS NOT NULL GROUP BY category").fetchall()
+        out: dict[str, dict[str, Any]] = {}
+        for r in regs:
+            out[r["name"]] = {"name": r["name"], "description": r["description"], "doc_count": 0, "registered": True}
+        for r in counts:
+            c = out.setdefault(r["name"], {"name": r["name"], "description": None, "doc_count": 0, "registered": False})
+            c["doc_count"] = int(r["n"])
+        return sorted(out.values(), key=lambda c: (-c["doc_count"], c["name"]))
+
+    def upsert_category(self, name: str, description: str | None) -> dict[str, Any]:
+        with self.connect() as conn:
+            cur = self._exec(conn, "UPDATE categories SET description=? WHERE name=?", (description, name))
+            if cur.rowcount == 0:
+                self._exec(conn, "INSERT INTO categories (name, description, created_at) VALUES (?,?,?)", (name, description, now_iso()))
+        return {"name": name, "description": description}
+
+    def rename_category(self, old: str, new: str) -> int:
+        """카테고리명 변경 — 문서에도 일괄 반영. 반환: 변경된 문서 수."""
+        with self.connect() as conn:
+            desc_row = self._exec(conn, "SELECT description FROM categories WHERE name=?", (old,)).fetchone()
+            self._exec(conn, "DELETE FROM categories WHERE name IN (?,?)", (old, new))
+            self._exec(conn, "INSERT INTO categories (name, description, created_at) VALUES (?,?,?)",
+                       (new, desc_row["description"] if desc_row else None, now_iso()))
+            cur = self._exec(conn, "UPDATE documents SET category=? WHERE category=?", (new, old))
+        return cur.rowcount
+
+    def delete_category(self, name: str, reassign_to: str | None = None) -> int:
+        with self.connect() as conn:
+            cur = self._exec(conn, "UPDATE documents SET category=? WHERE category=?", (reassign_to, name))
+            self._exec(conn, "DELETE FROM categories WHERE name=?", (name,))
+        return cur.rowcount
+
+    # ── tags (N4) ────────────────────────────────────────────────
+    def list_tags(self) -> list[dict[str, Any]]:
+        with self.connect() as conn:
+            rows = self._exec(conn, "SELECT tags FROM documents WHERE tags IS NOT NULL").fetchall()
+        from collections import Counter
+        c: Counter[str] = Counter()
+        for r in rows:
+            try:
+                c.update(t for t in json.loads(r["tags"]) if isinstance(t, str))
+            except (TypeError, ValueError):
+                continue
+        return [{"name": t, "doc_count": n} for t, n in sorted(c.items(), key=lambda x: (-x[1], x[0]))]
+
+    def _rewrite_tags(self, fn) -> int:
+        """모든 문서의 tags 배열을 fn(list)->list 로 재작성. 반환: 변경 문서 수."""
+        with self.connect() as conn:
+            rows = self._exec(conn, "SELECT id, tags FROM documents WHERE tags IS NOT NULL").fetchall()
+            changed = 0
+            for r in rows:
+                try:
+                    tags = [t for t in json.loads(r["tags"]) if isinstance(t, str)]
+                except (TypeError, ValueError):
+                    continue
+                new = fn(list(tags))
+                if new != tags:
+                    self._exec(conn, "UPDATE documents SET tags=? WHERE id=?",
+                               (json.dumps(new, ensure_ascii=False) if new else None, r["id"]))
+                    changed += 1
+        return changed
+
+    def rename_tag(self, old: str, new: str) -> int:
+        def fn(tags: list[str]) -> list[str]:
+            out = [new if t == old else t for t in tags]
+            dedup: list[str] = []
+            for t in out:
+                if t not in dedup:
+                    dedup.append(t)
+            return dedup
+        return self._rewrite_tags(fn)
+
+    def delete_tag(self, name: str) -> int:
+        return self._rewrite_tags(lambda tags: [t for t in tags if t != name])
 
     def delete_document(self, doc_id: str) -> bool:
         with self.connect() as conn:
@@ -226,7 +321,8 @@ class BaseDatabase(ABC):
                 conn,
                 """
                 SELECT c.id, c.document_id, c.chunk_index, c.section, c.content, c.embedding, c.embedding_model,
-                       d.document_id AS business_document_id, d.title, d.category, d.version, d.updated_at, d.effective_date
+                       d.document_id AS business_document_id, d.title, d.category, d.version, d.updated_at, d.effective_date,
+                       d.access_level
                 FROM chunks c JOIN documents d ON d.id = c.document_id
                 WHERE d.status='active' AND d.processing_status='indexed' AND c.embedding IS NOT NULL
                 """,
@@ -425,6 +521,14 @@ class SqliteDatabase(BaseDatabase):
         self._lock = threading.RLock()
         with self.connect() as conn:
             conn.executescript(SQLITE_SCHEMA)
+        # 기존 로컬 DB 마이그레이션(멱등): 새 컬럼이 없으면 추가
+        for ddl in ("ALTER TABLE documents ADD COLUMN tags TEXT",
+                    "ALTER TABLE documents ADD COLUMN access_level TEXT DEFAULT 'public'"):
+            try:
+                with self.connect() as conn:
+                    conn.execute(ddl)
+            except sqlite3.OperationalError:
+                pass  # duplicate column
 
     @contextmanager
     def connect(self) -> Iterator[sqlite3.Connection]:

@@ -291,3 +291,67 @@ def test_admin_settings_endpoint(seeded):
     s = seeded.get("/api/admin/settings").json()
     assert s["retrieval"]["mode"] in ("hybrid", "dense") and s["storage"]["db_backend"] in ("sqlite", "postgres")
     assert s["security"]["admin_auth"] is False and s["no_answer_message"].startswith("현재 등록된")
+
+
+def test_categories_and_tags_management(seeded):
+    # 카테고리: 등록/목록(문서 수 병합)/이름 변경(문서 반영)/삭제(재할당)
+    assert seeded.post("/api/categories", json={"name": "policy", "description": "정책 문서"}).status_code == 201
+    cats = {c["name"]: c for c in seeded.get("/api/categories").json()}
+    assert cats["policy"]["registered"] is True and cats["policy"]["doc_count"] == 0
+    assert cats["customer_service"]["doc_count"] == 1 and cats["customer_service"]["registered"] is False
+
+    r = seeded.patch("/api/categories/customer_service", json={"new_name": "cs"}).json()
+    assert r["documents_updated"] == 1
+    docs = seeded.get("/api/knowledge").json()
+    assert any(d["category"] == "cs" for d in docs) and not any(d["category"] == "customer_service" for d in docs)
+    r = seeded.delete("/api/categories/cs", params={"reassign_to": "policy"}).json()
+    assert r["documents_updated"] == 1
+    assert any(d["category"] == "policy" for d in seeded.get("/api/knowledge").json())
+
+    # 태그: 업로드 폼 → 저장/목록/이름 변경/삭제
+    doc = next(d for d in seeded.get("/api/knowledge").json() if d["category"] == "policy")
+    seeded.patch(f"/api/knowledge/{doc['id']}", json={"tags": ["환불", "VIP"]})
+    assert set(seeded.get(f"/api/knowledge/{doc['id']}").json()["tags"]) == {"환불", "VIP"}
+    tags = {t["name"]: t["doc_count"] for t in seeded.get("/api/tags").json()}
+    assert tags == {"환불": 1, "VIP": 1}
+    assert seeded.patch("/api/tags/VIP", json={"new_name": "우수고객"}).json()["documents_updated"] == 1
+    assert seeded.delete("/api/tags/환불").json()["documents_updated"] == 1
+    assert [t["name"] for t in seeded.get("/api/tags").json()] == ["우수고객"]
+
+
+def test_access_level_filters_at_retrieval(seeded):
+    # 배송 문서를 internal 로 → 익명 채팅에서는 검색 제외(Fail-Closed), 관리자 검색 테스트에서는 포함 선택 가능
+    docs = seeded.get("/api/knowledge").json()
+    ship = next(d for d in docs if d["document_id"] == "SHIPPING-002")
+    seeded.patch(f"/api/knowledge/{ship['id']}", json={"access_level": "internal"})
+    assert seeded.get(f"/api/knowledge/{ship['id']}").json()["access_level"] == "internal"
+
+    q = "배송비는 얼마인가요?"
+    body = seeded.post("/api/chat", json={"message": q}).json()
+    assert body["answerable"] is False  # public만 검색 → 근거 없음
+    st_all = seeded.post("/api/search/test", json={"query": q, "include_internal": True}).json()
+    assert any(r["document_id"] == "SHIPPING-002" for r in st_all["results"])
+    st_pub = seeded.post("/api/search/test", json={"query": q, "include_internal": False}).json()
+    assert not any(r["document_id"] == "SHIPPING-002" for r in st_pub["results"])
+
+    # 다시 public 으로 → 채팅 가능
+    seeded.patch(f"/api/knowledge/{ship['id']}", json={"access_level": "public"})
+    assert seeded.post("/api/chat", json={"message": q}).json()["answerable"] is True
+
+
+def test_upload_with_tags_and_access_level(seeded):
+    r = seeded.post("/api/knowledge", data={"sync": "true", "title": "내부 지침", "document_id": "INT-001",
+                                            "tags": "내부, 지침", "access_level": "internal", "content": "# 내부 지침\n직원 전용 안내입니다.",
+                                            "filename": "internal.md"})
+    assert r.status_code == 201, r.text
+    d = r.json()
+    assert d["tags"] == ["내부", "지침"] and d["access_level"] == "internal"
+    seeded.delete(f"/api/knowledge/{d['id']}")
+
+
+def test_monitoring_endpoint(seeded):
+    m = seeded.get("/api/admin/monitoring").json()
+    assert m["summary"]["total"] == 3 and m["summary"]["indexed"] == 3 and m["summary"]["error"] == 0
+    job = m["jobs"][0]
+    assert {"title", "processing_status", "elapsed_s", "chunk_count", "access_level"} <= set(job)
+    assert m["uptime_s"] >= 0 and "system" in m and m["open_inquiries"] == 0

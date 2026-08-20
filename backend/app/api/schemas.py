@@ -74,6 +74,8 @@ class DocumentOut(BaseModel):
     processing_status: str
     error_message: str | None = None
     chunk_count: int = 0
+    tags: list[str] = []
+    access_level: Literal["public", "internal"] = "public"
     created_at: str
     indexed_at: str | None = None
 
@@ -96,6 +98,22 @@ class DocumentPatch(BaseModel):
     title: str | None = None
     category: str | None = None
     version: str | None = None
+    tags: list[str] | None = None
+    access_level: Literal["public", "internal"] | None = None
+
+
+class CategoryIn(BaseModel):
+    name: str = Field(min_length=1, max_length=100)
+    description: str | None = Field(default=None, max_length=300)
+
+
+class CategoryPatch(BaseModel):
+    new_name: str | None = Field(default=None, min_length=1, max_length=100)
+    description: str | None = Field(default=None, max_length=300)
+
+
+class TagPatch(BaseModel):
+    new_name: str = Field(min_length=1, max_length=100)
 
 
 class SearchTestRequest(BaseModel):
@@ -104,6 +122,8 @@ class SearchTestRequest(BaseModel):
     previous_query: str | None = Field(default=None, max_length=2000)   # 후속 질문 Rewrite 시뮬레이션용(직전 사용자 질문)
     expected_document_id: str | None = None                            # 정답 문서(document_id 또는 pk) → Top-k Hit 계산
     use_multi_query: bool = False                                      # LLM 으로 쿼리 확장 후 RRF union (extractive 면 무시)
+    include_internal: bool = True                                      # 내부(internal) 문서 포함 여부 — 관리자 화면 기본 포함
+
 
 
 class SearchTestHit(BaseModel):

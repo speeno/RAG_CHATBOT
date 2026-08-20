@@ -52,7 +52,7 @@ class RetrievedChunk:
 
 class VectorStore(ABC):
     @abstractmethod
-    def search(self, query_vec: np.ndarray, top_k: int) -> list[RetrievedChunk]: ...
+    def search(self, query_vec: np.ndarray, top_k: int, allowed_levels: set[str] | None = None) -> list[RetrievedChunk]: ...
 
     @abstractmethod
     def invalidate(self) -> None:
@@ -127,22 +127,34 @@ class NumpyVectorStore(VectorStore):
             return None
         return self._matrix @ q
 
-    def search(self, query_vec: np.ndarray, top_k: int) -> list[RetrievedChunk]:
+    def _allowed_mask(self, allowed_levels: set[str] | None) -> np.ndarray | None:
+        """접근 레벨 필터(PRD §29) — LLM 이전, 검색 단계에서 적용한다. None 이면 전체 허용(관리자)."""
+        if allowed_levels is None:
+            return None
+        return np.array([(r.get("access_level") or "public") in allowed_levels for r in self._rows], dtype=bool)
+
+    def search(self, query_vec: np.ndarray, top_k: int, allowed_levels: set[str] | None = None) -> list[RetrievedChunk]:
         scores = self._dense_scores(query_vec)
         if scores is None:
             return []
-        idx = np.argsort(-scores)[:top_k]
-        return [self._chunk(int(i), scores[int(i)]) for i in idx]
+        mask = self._allowed_mask(allowed_levels)
+        if mask is not None:
+            scores = np.where(mask, scores, -np.inf)
+        idx = [int(i) for i in np.argsort(-scores)[:top_k] if scores[int(i)] != -np.inf]
+        return [self._chunk(i, scores[i]) for i in idx]
 
     def search_hybrid(self, query_vec: np.ndarray, query_text: str, top_k: int,
                       dense_n: int = 30, sparse_n: int = 30, rrf_k: int = 60,
-                      dense_weight: float = 0.7) -> list[RetrievedChunk]:
+                      dense_weight: float = 0.7, allowed_levels: set[str] | None = None) -> list[RetrievedChunk]:
         """Dense top-N + BM25 top-N → 가중 RRF 융합 → top_k (PRD §17). dense 를 우선하되 BM25 로 recall 보강."""
         scores = self._dense_scores(query_vec)
         if scores is None:
             return []
-        dense_rank = [int(i) for i in np.argsort(-scores)[:dense_n]]
-        sparse = self._bm25.search(query_text, top_k=sparse_n)
+        mask = self._allowed_mask(allowed_levels)
+        if mask is not None:
+            scores = np.where(mask, scores, -np.inf)
+        dense_rank = [int(i) for i in np.argsort(-scores)[:dense_n] if scores[int(i)] != -np.inf]
+        sparse = [(i, sc) for i, sc in self._bm25.search(query_text, top_k=sparse_n) if mask is None or mask[i]]
         bm25_by_idx = dict(sparse)
         fused = rrf_fuse([dense_rank, [i for i, _ in sparse]], k=rrf_k,
                          weights=[dense_weight, 1.0 - dense_weight])[:top_k]
@@ -178,27 +190,28 @@ class Retriever:
         self.candidate_n = candidate_n
         self.dense_weight = max(0.0, min(1.0, dense_weight))
 
-    def _search(self, query: str, top_k: int) -> list[RetrievedChunk]:
+    def _search(self, query: str, top_k: int, allowed_levels: set[str] | None = None) -> list[RetrievedChunk]:
         qv = self.embedder.embed_query(query)
         if self.mode == "hybrid" and isinstance(self.store, NumpyVectorStore):
             return self.store.search_hybrid(qv, query, top_k, dense_n=self.candidate_n,
                                             sparse_n=self.candidate_n, rrf_k=self.rrf_k,
-                                            dense_weight=self.dense_weight)
-        return self.store.search(qv, top_k)
+                                            dense_weight=self.dense_weight, allowed_levels=allowed_levels)
+        return self.store.search(qv, top_k, allowed_levels=allowed_levels)
 
-    def retrieve(self, query: str, top_k: int | None = None) -> RetrievalResult:
+    def retrieve(self, query: str, top_k: int | None = None, allowed_levels: set[str] | None = None) -> RetrievalResult:
         t0 = time.perf_counter()
-        chunks = self._search(query, top_k or self.top_k)
+        chunks = self._search(query, top_k or self.top_k, allowed_levels)
         elapsed = int((time.perf_counter() - t0) * 1000)
         top = max((c.score for c in chunks), default=0.0)
         return RetrievalResult(query=query, chunks=chunks, elapsed_ms=elapsed, top_score=top,
                                mode=self.mode, queries=[query])
 
-    def retrieve_multi(self, queries: list[str], top_k: int | None = None) -> RetrievalResult:
+    def retrieve_multi(self, queries: list[str], top_k: int | None = None,
+                       allowed_levels: set[str] | None = None) -> RetrievalResult:
         """Multi Query(PRD §20): 쿼리별 검색 결과를 RRF 로 union. 첫 쿼리가 원 질문."""
         t0 = time.perf_counter()
         k = top_k or self.top_k
-        per_query: list[list[RetrievedChunk]] = [self._search(q, k * 2) for q in queries]
+        per_query: list[list[RetrievedChunk]] = [self._search(q, k * 2, allowed_levels) for q in queries]
         best: dict[str, RetrievedChunk] = {}
         rankings: list[list[str]] = []
         for chunks in per_query:

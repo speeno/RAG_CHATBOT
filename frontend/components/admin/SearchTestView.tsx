@@ -27,6 +27,7 @@ export function SearchTestView() {
   const [topK, setTopK] = useState(10);
   const [expectedDoc, setExpectedDoc] = useState("");
   const [useMultiQuery, setUseMultiQuery] = useState(false);
+  const [includeInternal, setIncludeInternal] = useState(true);
   const [docs, setDocs] = useState<DocumentItem[]>([]);
   const [showSettings, setShowSettings] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
@@ -55,6 +56,7 @@ export function SearchTestView() {
           previous_query: previousQuery.trim() || null,
           expected_document_id: expectedDoc || null,
           use_multi_query: useMultiQuery,
+          include_internal: includeInternal,
         });
         setRes(r);
         setSelected(r.results[0] ?? null);
@@ -68,7 +70,7 @@ export function SearchTestView() {
         setBusy(false);
       }
     },
-    [query, busy, topK, previousQuery, expectedDoc, useMultiQuery],
+    [query, busy, topK, previousQuery, expectedDoc, useMultiQuery, includeInternal],
   );
 
   const onKey = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -142,6 +144,10 @@ export function SearchTestView() {
             <label className="st-check">
               <span className="field-label">Multi Query <small className="muted">(LLM 쿼리 확장 + RRF union)</small></span>
               <label className="st-toggle"><input type="checkbox" checked={useMultiQuery} onChange={(e) => setUseMultiQuery(e.target.checked)} /> 사용</label>
+            </label>
+            <label className="st-check">
+              <span className="field-label">내부 문서 <small className="muted">(access: internal)</small></span>
+              <label className="st-toggle"><input type="checkbox" checked={includeInternal} onChange={(e) => setIncludeInternal(e.target.checked)} /> 포함</label>
             </label>
             <label>
               <span className="field-label">정답 문서 <small className="muted">(Top-1/3/5 Hit 계산)</small></span>

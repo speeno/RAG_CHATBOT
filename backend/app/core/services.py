@@ -2,7 +2,8 @@
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass
+import time
+from dataclasses import dataclass, field
 
 from app.core.config import NO_ANSWER_MESSAGE, Settings
 from app.core.db import BaseDatabase, build_database
@@ -27,6 +28,7 @@ class Services:
     llm: LLMProvider
     indexer: Indexer
     orchestrator: RAGOrchestrator
+    started_at: float = field(default_factory=time.time)
 
     def health(self) -> dict:
         # DB를 실제로 한 번 조회한다 — 외부 keep-alive ping이 Supabase 무활동 정지까지 막도록(배포 문서 참고)

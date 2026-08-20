@@ -17,6 +17,9 @@ const ADMIN_NAV = [
   { href: "/admin/search-test", label: "검색 테스트", icon: "search" },
   { href: "/admin/logs", label: "상담 로그", icon: "user-log" },
   { href: "/admin/unanswered", label: "미답변 분석", icon: "help" },
+  { href: "/admin/taxonomy", label: "분류 관리", icon: "file-text" },
+  { href: "/admin/access", label: "권한 관리", icon: "shield-check" },
+  { href: "/admin/monitoring", label: "모니터링", icon: "eye" },
   { href: "/admin/settings", label: "설정", icon: "settings" },
 ];
 

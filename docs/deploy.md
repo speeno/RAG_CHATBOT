@@ -9,7 +9,7 @@
 
 | 구성 | URL / 식별자 |
 |---|---|
-| 프론트(Vercel, 프로젝트 `rag-chatbot`, 스코프 mudotmusic-6437) | https://rag-chatbot-ten-cyan.vercel.app |
+| 프론트(Vercel, 프로젝트 `rag-chatbot`, 스코프 mudotmusic-6437) | https://rag-chatbot-ten-cyan.vercel.app (사용자 공유용: **/embed**) |
 | 백엔드(Render, `rag-chatbot-api`, free, singapore, `srv-da2qv00n74is738hld7g`) | https://rag-chatbot-api-6aqk.onrender.com (`/api/health`) |
 | DB(Supabase, `rag-chatbot`, ap-southeast-1, ref `ytlprajblmrjfkgjnivv`) | Session Pooler `aws-0-ap-southeast-1.pooler.supabase.com:5432` — 비밀번호는 Render env `DATABASE_URL`에만 있음 |
 

@@ -13,6 +13,9 @@ const TITLES: Record<string, string> = {
   "/admin/search-test": "검색 테스트",
   "/admin/logs": "상담 로그",
   "/admin/unanswered": "미답변 분석",
+  "/admin/taxonomy": "분류 관리",
+  "/admin/access": "권한 관리",
+  "/admin/monitoring": "모니터링",
   "/admin/settings": "설정",
 };
 

@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import time as _time
 from typing import Any, Iterator
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
@@ -188,6 +189,8 @@ async def upload_knowledge(
     source: str | None = Form(default=None),
     language: str | None = Form(default=None),
     status: str | None = Form(default=None),
+    tags: str | None = Form(default=None),          # 쉼표 구분 (예: "환불,VIP")
+    access_level: str | None = Form(default=None),  # public | internal
     sync: bool = Form(default=False),
 ) -> dict[str, Any]:
     """문서 등록. multipart로 `file`을 올리거나 `content`(+`filename`) 텍스트를 직접 보낸다.
@@ -222,6 +225,14 @@ async def upload_knowledge(
         "status": status,
     }
     doc = svc.indexer.register(text, filename=name, overrides=overrides)
+    extra: dict[str, Any] = {}
+    if tags and tags.strip():
+        extra["tags"] = json.dumps([t.strip() for t in tags.split(",") if t.strip()], ensure_ascii=False)
+    if access_level in ("public", "internal"):
+        extra["access_level"] = access_level
+    if extra:
+        svc.db.update_document(doc["id"], **extra)
+        doc = svc.db.get_document(doc["id"])
     if sync:
         doc = svc.indexer.index(doc["id"])
     else:
@@ -249,6 +260,9 @@ def patch_knowledge(doc_id: str, patch: S.DocumentPatch, svc: Services = Depends
     if not svc.db.get_document(doc_id):
         raise HTTPException(404, "document not found")
     fields = {k: v for k, v in patch.model_dump().items() if v is not None}
+    if "tags" in fields:
+        tags = [t.strip() for t in fields["tags"] if t and t.strip()]
+        fields["tags"] = json.dumps(tags, ensure_ascii=False) if tags else None
     svc.db.update_document(doc_id, **fields)
     svc.store.invalidate()
     return svc.db.get_document(doc_id)  # type: ignore[return-value]
@@ -348,6 +362,81 @@ def patch_inquiry(inquiry_id: str, body: S.InquiryPatch, svc: Services = Depends
     return {"ok": True}
 
 
+# ── categories / tags (N4 분류 관리) ────────────────────────────
+@admin.get("/categories")
+def list_categories(svc: Services = Depends(get_services)) -> list[dict[str, Any]]:
+    return svc.db.list_categories()
+
+
+@admin.post("/categories", status_code=201)
+def create_category(body: S.CategoryIn, svc: Services = Depends(get_services)) -> dict[str, Any]:
+    return svc.db.upsert_category(body.name.strip(), (body.description or "").strip() or None)
+
+
+@admin.patch("/categories/{name}")
+def patch_category(name: str, body: S.CategoryPatch, svc: Services = Depends(get_services)) -> dict[str, Any]:
+    changed = 0
+    if body.new_name and body.new_name.strip() and body.new_name.strip() != name:
+        changed = svc.db.rename_category(name, body.new_name.strip())
+        name = body.new_name.strip()
+    if body.description is not None:
+        svc.db.upsert_category(name, body.description.strip() or None)
+    svc.store.invalidate()
+    return {"ok": True, "name": name, "documents_updated": changed}
+
+
+@admin.delete("/categories/{name}")
+def delete_category(name: str, reassign_to: str | None = None, svc: Services = Depends(get_services)) -> dict[str, Any]:
+    changed = svc.db.delete_category(name, (reassign_to or "").strip() or None)
+    svc.store.invalidate()
+    return {"ok": True, "documents_updated": changed}
+
+
+@admin.get("/tags")
+def list_tags(svc: Services = Depends(get_services)) -> list[dict[str, Any]]:
+    return svc.db.list_tags()
+
+
+@admin.patch("/tags/{name}")
+def rename_tag(name: str, body: S.TagPatch, svc: Services = Depends(get_services)) -> dict[str, Any]:
+    return {"ok": True, "documents_updated": svc.db.rename_tag(name, body.new_name.strip())}
+
+
+@admin.delete("/tags/{name}")
+def delete_tag(name: str, svc: Services = Depends(get_services)) -> dict[str, Any]:
+    return {"ok": True, "documents_updated": svc.db.delete_tag(name)}
+
+
+# ── monitoring (N6) ──────────────────────────────────────────────
+@admin.get("/admin/monitoring")
+def monitoring(svc: Services = Depends(get_services)) -> dict[str, Any]:
+    """색인 작업 현황 + 시스템 상태 — /admin/monitoring 화면."""
+    from datetime import datetime
+
+    def _elapsed(d: dict[str, Any]) -> float | None:
+        if not d.get("indexed_at") or not d.get("created_at"):
+            return None
+        try:
+            return round((datetime.fromisoformat(d["indexed_at"]) - datetime.fromisoformat(d["created_at"])).total_seconds(), 1)
+        except ValueError:
+            return None
+
+    docs = svc.db.list_documents()
+    jobs = [{
+        "id": d["id"], "title": d["title"], "document_id": d["document_id"], "category": d.get("category"),
+        "processing_status": d["processing_status"], "error_message": d.get("error_message"),
+        "chunk_count": d.get("chunk_count", 0), "created_at": d["created_at"], "indexed_at": d.get("indexed_at"),
+        "elapsed_s": _elapsed(d), "status": d["status"], "access_level": d.get("access_level", "public"),
+    } for d in docs]
+    summary = {"total": len(docs),
+               "indexed": sum(1 for d in docs if d["processing_status"] == "indexed"),
+               "processing": sum(1 for d in docs if d["processing_status"] not in ("indexed", "error")),
+               "error": sum(1 for d in docs if d["processing_status"] == "error")}
+    return {"summary": summary, "jobs": jobs, "system": svc.health(),
+            "uptime_s": int(_time.time() - svc.started_at),
+            "open_inquiries": len(svc.db.list_inquiries(limit=500, status="open"))}
+
+
 # ── search test (관리자용 검색 디버그, PRD §32) ───────────────────
 @admin.post("/search/test", response_model=S.SearchTestResponse)
 def search_test(req: S.SearchTestRequest, svc: Services = Depends(get_services)) -> dict[str, Any]:
@@ -358,7 +447,8 @@ def search_test(req: S.SearchTestRequest, svc: Services = Depends(get_services))
     rewritten = search_query if search_query != normalized else None
     threshold = svc.settings.score_threshold
 
-    r = svc.orchestrator.search(search_query, use_multi_query=req.use_multi_query, top_k=req.top_k)
+    access = None if req.include_internal else {"public"}
+    r = svc.orchestrator.search(search_query, use_multi_query=req.use_multi_query, top_k=req.top_k, access_levels=access)
     results = []
     for i, c in enumerate(r.chunks):
         results.append({

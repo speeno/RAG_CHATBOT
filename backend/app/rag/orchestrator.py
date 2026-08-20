@@ -89,7 +89,7 @@ class RAGOrchestrator:
         # 1) 검색 (대화 맥락 반영 Rewrite → 필요 시 Multi Query 확장 → Hybrid 검색)
         search_query = self.build_search_query(message, history)
         rewritten = search_query if search_query != message else None
-        retrieval = self.search(search_query)
+        retrieval = self.search(search_query, access_levels={"public"})  # 익명 사용자 채팅 → public 문서만(PRD §29)
         retrieved_log = [c.as_source() for c in retrieval.chunks]
 
         # 2) Fail-Closed: 근거 부족 → LLM 호출 없이 표준 안내
@@ -153,7 +153,8 @@ class RAGOrchestrator:
             return f"{prev_user} {message}"
         return message
 
-    def search(self, query: str, *, use_multi_query: bool | None = None, top_k: int | None = None):
+    def search(self, query: str, *, use_multi_query: bool | None = None, top_k: int | None = None,
+               access_levels: set[str] | None = None):
         """검색 파이프라인: (Multi Query) → Hybrid 검색 → (Reranker). 검색 테스트 화면도 이 경로를 쓴다."""
         from app.rag.multiquery import generate_multi_queries
 
@@ -161,8 +162,8 @@ class RAGOrchestrator:
         queries = [query]
         if mq:
             queries += generate_multi_queries(self.llm, query, n=self.multi_query_n)
-        retrieval = (self.retriever.retrieve_multi(queries, top_k=top_k) if len(queries) > 1
-                     else self.retriever.retrieve(query, top_k=top_k))
+        retrieval = (self.retriever.retrieve_multi(queries, top_k=top_k, allowed_levels=access_levels) if len(queries) > 1
+                     else self.retriever.retrieve(query, top_k=top_k, allowed_levels=access_levels))
         if self.reranker is not None and self.reranker.name != "none" and retrieval.chunks:
             t0 = time.perf_counter()
             retrieval.chunks = self.reranker.rerank(query, retrieval.chunks)
