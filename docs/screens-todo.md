@@ -85,8 +85,9 @@
 ## 구현 순서 (완료)
 1. ~~A4 검색 테스트~~ ✅ 2. ~~A5 상담 로그~~ ✅ 3. ~~A1 대시보드~~ ✅ 4. ~~A6 미답변 분석~~ ✅ 5. ~~U3 핸드오프 버튼~~ ✅ 6. ~~관리자 인증(단일 토큰)~~ ✅
 
-## 남은 것 (후순위 / Phase 2~4)
-- 검색 품질(Phase 2): BM25 하이브리드·Reranker·Multi Query → 검색 테스트 화면의 BM25/Reranker 열·Multi Query 카드 채우기, 골든셋 기반 Top-k Hit → 대시보드 Retrieval 지표
-- RBAC(역할·문서별 권한), 문서 버전 관리 화면, 플로팅 챗봇 위젯(§41), 상담원 Agent-assist(§5.2)
+## 남은 것 (후순위 / Phase 3~4)
+- ~~검색 품질(Phase 2)~~ ✅ 2026-08-20: BM25 하이브리드(가중 RRF)·Multi Query(LLM 확장, 검색 테스트 토글/`MULTI_QUERY`)·Reranker 인터페이스(`RERANKER=llm`)·골든셋 평가(`eval/golden.jsonl`+`scripts/eval_retrieval.py`, Recall@5 100%). 검색 테스트 화면 BM25 열·Multi Query 카드 채워짐(Reranker 열은 `RERANKER=llm`일 때).
+- 대시보드 Retrieval 지표(Top-k Hit)를 골든셋 정기 실행과 연동(현재는 스크립트 수동 실행)
+- RBAC(역할·문서별 권한), 문서 버전 관리 화면, PII 마스킹, 플로팅 챗봇 위젯(§41), 상담원 Agent-assist(§5.2)
 
 각 화면은 `docs/design/html/admin/*.html`의 토큰/컴포넌트(`shared.css`)를 그대로 재사용해 `app/globals.css`에 옮기면 된다.

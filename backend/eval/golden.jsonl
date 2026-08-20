@@ -1,0 +1,14 @@
+{"query": "환불은 며칠 이내에 신청해야 하나요?", "expected_document_id": "REFUND-001", "note": "환불 가능 기간(7일)"}
+{"query": "환불 신청은 어디서 하나요?", "expected_document_id": "REFUND-001", "note": "환불 신청 방법(마이페이지)"}
+{"query": "환불 처리 기간은 얼마나 걸리나요?", "expected_document_id": "REFUND-001", "note": "환불 처리 3~5영업일"}
+{"query": "교환은 어떤 조건에서 가능한가요?", "expected_document_id": "REFUND-001", "note": "교환 신청"}
+{"query": "포장을 뜯었는데 환불이 될까요?", "expected_document_id": "REFUND-001", "note": "환불 불가 사유"}
+{"query": "배송이 늦어지면 환불받을 수 있나요?", "expected_document_id": "REFUND-001", "note": "배송 지연 환불(3영업일)"}
+{"query": "배송비는 얼마인가요?", "expected_document_id": "SHIPPING-002", "note": "배송비 편도 3,000원"}
+{"query": "배송은 보통 며칠 걸리나요?", "expected_document_id": "SHIPPING-002", "note": "배송 기간 1~3일"}
+{"query": "택배 배송 조회는 어떻게 하나요?", "expected_document_id": "SHIPPING-002", "note": "배송 조회 방법(운송장)"}
+{"query": "배송지를 바꾸고 싶어요", "expected_document_id": "SHIPPING-002", "note": "배송지 변경"}
+{"query": "주문 취소는 언제까지 가능한가요?", "expected_document_id": "ORDER-003", "note": "취소 가능 시점(결제 후)"}
+{"query": "주문한 상품 중 일부만 취소할 수 있나요?", "expected_document_id": "ORDER-003", "note": "부분 취소"}
+{"query": "주문 취소하면 돈은 언제 돌려받나요?", "expected_document_id": "ORDER-003", "note": "취소 후 환불 처리"}
+{"query": "결제 완료 후 주문을 취소하는 방법", "expected_document_id": "ORDER-003", "note": "주문 취소 방법"}

@@ -26,6 +26,7 @@ export function SearchTestView() {
   const [previousQuery, setPreviousQuery] = useState("");
   const [topK, setTopK] = useState(10);
   const [expectedDoc, setExpectedDoc] = useState("");
+  const [useMultiQuery, setUseMultiQuery] = useState(false);
   const [docs, setDocs] = useState<DocumentItem[]>([]);
   const [showSettings, setShowSettings] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
@@ -53,6 +54,7 @@ export function SearchTestView() {
           top_k: topK,
           previous_query: previousQuery.trim() || null,
           expected_document_id: expectedDoc || null,
+          use_multi_query: useMultiQuery,
         });
         setRes(r);
         setSelected(r.results[0] ?? null);
@@ -66,7 +68,7 @@ export function SearchTestView() {
         setBusy(false);
       }
     },
-    [query, busy, topK, previousQuery, expectedDoc],
+    [query, busy, topK, previousQuery, expectedDoc, useMultiQuery],
   );
 
   const onKey = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -136,6 +138,10 @@ export function SearchTestView() {
             <label>
               <span className="field-label">직전 사용자 질문 <small className="muted">(후속 질문 Rewrite 시뮬레이션)</small></span>
               <input className="input" placeholder="예) 배송은 며칠 걸리나요?" value={previousQuery} onChange={(e) => setPreviousQuery(e.target.value)} />
+            </label>
+            <label className="st-check">
+              <span className="field-label">Multi Query <small className="muted">(LLM 쿼리 확장 + RRF union)</small></span>
+              <label className="st-toggle"><input type="checkbox" checked={useMultiQuery} onChange={(e) => setUseMultiQuery(e.target.checked)} /> 사용</label>
             </label>
             <label>
               <span className="field-label">정답 문서 <small className="muted">(Top-1/3/5 Hit 계산)</small></span>
@@ -212,7 +218,7 @@ export function SearchTestView() {
             {res && res.multi_queries.length > 0 ? (
               <ol className="mq">{res.multi_queries.map((q, i) => <li key={i}><span>{i + 1}</span><span>{q}</span></li>)}</ol>
             ) : (
-              <div className="gbox"><span className="muted">Phase 2(Multi Query)에서 제공됩니다. 현재는 단일 쿼리로 검색합니다.</span></div>
+              <div className="gbox"><span className="muted">{useMultiQuery ? "생성된 확장 쿼리가 없습니다(오프라인 LLM이거나 생성 실패)." : "설정에서 Multi Query를 켜면 LLM이 확장 쿼리를 생성해 함께 검색합니다."}</span></div>
             )}
           </section>
         </div>

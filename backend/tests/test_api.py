@@ -89,18 +89,20 @@ def test_prompt_injection_in_document_is_treated_as_data(seeded):
 
 def test_search_test_reports_threshold_rewrite_and_hit(seeded):
     r = seeded.post("/api/search/test", json={"query": "  환불은   며칠 이내에 신청해야 하나요?  ", "top_k": 5,
-                                              "expected_document_id": "REFUND-001"})
+                                              "expected_document_id": "REFUND-001", "use_multi_query": True})
     assert r.status_code == 200, r.text
     body = r.json()
     assert body["normalized_query"] == "환불은 며칠 이내에 신청해야 하나요?"
     assert body["rewritten_query"] is None and body["search_query"] == body["normalized_query"]
-    assert body["multi_queries"] == []
+    assert body["multi_queries"] == []  # extractive LLM → Multi Query 생성 불가(무시)
+    assert body["retrieval_mode"].startswith("hybrid") and body["reranker"] == "none"
     assert body["passes_threshold"] is True and body["top_score"] >= body["threshold"]
     assert body["indexed_chunks"] > 0 and body["embedding_provider"]
     assert body["hit"]["top5"] is True and body["hit"]["rank"] is not None
     top = body["results"][0]
     assert top["rank"] == 1 and top["passes_threshold"] is True and top["content"]
     assert "bm25_score" in top and "rerank_score" in top
+    assert any(x["bm25_score"] is not None for x in body["results"])  # Hybrid: BM25 상위 후보에 점수 존재
 
     # 짧은 후속 질문 + previous_query → Rewrite 적용
     r2 = seeded.post("/api/search/test", json={"query": "그럼 배송비는?", "previous_query": "배송은 며칠 걸리나요?"})
@@ -211,3 +213,20 @@ def test_admin_token_gate(tmp_path, monkeypatch):
 def test_admin_open_when_token_unset(client):
     assert client.get("/api/health").json()["admin_auth"] is False
     assert client.get("/api/admin/me").status_code == 200
+
+
+def test_golden_recall_at_5_offline(seeded, monkeypatch):
+    """골든셋 회귀 가드: 오프라인(hash) 하이브리드 검색으로도 문서 단위 Recall@5 ≥ 90% (KPI)."""
+    import json
+    from pathlib import Path
+
+    golden = [json.loads(l) for l in (Path(__file__).resolve().parent.parent / "eval" / "golden.jsonl").read_text().splitlines() if l.strip()]
+    svc = None
+    # TestClient 앱의 서비스 재사용
+    svc = seeded.app.state.services
+    ok = 0
+    for row in golden:
+        res = svc.retriever.retrieve(row["query"], top_k=5)
+        if row["expected_document_id"] in {c.document_id for c in res.chunks}:
+            ok += 1
+    assert ok / len(golden) >= 0.9, f"Recall@5 {ok}/{len(golden)}"

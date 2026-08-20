@@ -314,7 +314,7 @@ def search_test(req: S.SearchTestRequest, svc: Services = Depends(get_services))
     rewritten = search_query if search_query != normalized else None
     threshold = svc.settings.score_threshold
 
-    r = svc.retriever.retrieve(search_query, top_k=req.top_k)
+    r = svc.orchestrator.search(search_query, use_multi_query=req.use_multi_query, top_k=req.top_k)
     results = []
     for i, c in enumerate(r.chunks):
         results.append({
@@ -322,8 +322,9 @@ def search_test(req: S.SearchTestRequest, svc: Services = Depends(get_services))
             "rank": i + 1,
             "content": c.content,
             "passes_threshold": c.score >= threshold,
-            "bm25_score": None,      # Phase 2: Hybrid(BM25) 도입 시 채움
-            "rerank_score": None,    # Phase 2: Reranker 도입 시 채움
+            "bm25_score": c.bm25_score,
+            "rerank_score": c.rerank_score,
+            "fused_score": c.fused_score,
         })
 
     hit = None
@@ -338,7 +339,9 @@ def search_test(req: S.SearchTestRequest, svc: Services = Depends(get_services))
         "normalized_query": normalized,
         "rewritten_query": rewritten,
         "search_query": search_query,
-        "multi_queries": [],
+        "multi_queries": r.queries[1:],
+        "retrieval_mode": r.mode,
+        "reranker": svc.reranker.name,
         "threshold": threshold,
         "passes_threshold": bool(r.chunks) and r.top_score >= threshold,
         "top_score": round(float(r.top_score), 4),

@@ -269,7 +269,9 @@ ul { list-style: none; }
 .st-hist-item .dot.miss { background: #c9ced8; }
 .st-hist-item .q { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .st-hist-item .meta { color: #8a94a6; font-size: 12px; white-space: nowrap; }
-.st-settings { display: grid; grid-template-columns: 120px minmax(0, 1fr) minmax(0, 1fr); gap: 14px; }
+.st-settings { display: grid; grid-template-columns: 120px minmax(0, 1fr) 190px minmax(0, 1fr); gap: 14px; }
+.st-toggle { display: inline-flex; align-items: center; gap: 8px; height: 38px; font-size: 13.5px; color: var(--text); cursor: pointer; }
+.st-toggle input { width: 16px; height: 16px; accent-color: var(--primary); }
 .st-settings label { display: block; min-width: 0; }
 .st-settings .field-label small { font-weight: 400; }
 @media (max-width: 1100px) { .st-settings { grid-template-columns: 1fr; } }

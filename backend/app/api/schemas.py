@@ -100,6 +100,7 @@ class SearchTestRequest(BaseModel):
     top_k: int = Field(default=10, ge=1, le=50)
     previous_query: str | None = Field(default=None, max_length=2000)   # 후속 질문 Rewrite 시뮬레이션용(직전 사용자 질문)
     expected_document_id: str | None = None                            # 정답 문서(document_id 또는 pk) → Top-k Hit 계산
+    use_multi_query: bool = False                                      # LLM 으로 쿼리 확장 후 RRF union (extractive 면 무시)
 
 
 class SearchTestHit(BaseModel):
@@ -114,7 +115,9 @@ class SearchTestResponse(BaseModel):
     normalized_query: str
     rewritten_query: str | None
     search_query: str
-    multi_queries: list[str]          # Phase 2(Multi Query) 도입 전까지는 []
+    multi_queries: list[str]          # use_multi_query=True 이고 LLM 사용 가능할 때 생성된 확장 쿼리
+    retrieval_mode: str = "dense"     # dense | hybrid(+multi)(+rerank)
+    reranker: str = "none"
     threshold: float
     passes_threshold: bool            # top1 score >= threshold (아니면 Fail-Closed)
     top_score: float
@@ -186,6 +189,8 @@ class HealthOut(BaseModel):
     admin_auth: bool = False
     llm_provider: str
     embedding_provider: str
+    retrieval_mode: str = "dense"
+    reranker: str = "none"
     score_threshold: float
     indexed_chunks: int
     offline_mode: bool

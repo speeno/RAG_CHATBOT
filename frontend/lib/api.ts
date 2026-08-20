@@ -50,6 +50,7 @@ export type SearchTestResult = Source & {
   passes_threshold: boolean;
   bm25_score: number | null;
   rerank_score: number | null;
+  fused_score: number | null;
 };
 
 export type SearchTestResponse = {
@@ -58,6 +59,8 @@ export type SearchTestResponse = {
   rewritten_query: string | null;
   search_query: string;
   multi_queries: string[];
+  retrieval_mode: string;
+  reranker: string;
   threshold: number;
   passes_threshold: boolean;
   top_score: number;
@@ -154,6 +157,8 @@ export type Health = {
   db_backend: string;
   db_ok: boolean;
   admin_auth: boolean;
+  retrieval_mode?: string;
+  reranker?: string;
   llm_provider: string;
   embedding_provider: string;
   score_threshold: number;
@@ -249,7 +254,7 @@ export const api = {
   getLog: (messageId: string) => f(`${API_URL}/api/logs/${messageId}`, { cache: "no-store" }).then(j<TurnLog>),
   getConversation: (id: string) => f(`${API_URL}/api/conversations/${id}`, { cache: "no-store" }).then(j<ConversationOut>),
 
-  searchTest: (body: { query: string; top_k?: number; previous_query?: string | null; expected_document_id?: string | null }) =>
+  searchTest: (body: { query: string; top_k?: number; previous_query?: string | null; expected_document_id?: string | null; use_multi_query?: boolean }) =>
     f(`${API_URL}/api/search/test`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },

@@ -35,10 +35,17 @@ class Settings(BaseSettings):
     voyage_model: str = "voyage-3"
     local_embedding_model: str = "intfloat/multilingual-e5-small"
 
-    # Retrieval
+    # Retrieval (Phase 2: Hybrid + Multi Query + Reranker)
     top_k: int = 5
     retrieval_score_threshold: float | None = None
     max_context_chunks: int = 5
+    retrieval_mode: str = "hybrid"       # hybrid(dense+BM25 RRF) | dense
+    rrf_k: int = 60                      # RRF 상수 (클수록 순위 차이 완만)
+    dense_weight: float = 0.7            # 가중 RRF 에서 dense 축 비중 (sparse = 1 - dense_weight)
+    retrieval_candidates: int = 30       # dense/sparse 각 후보 수 (PRD §17 top-30)
+    multi_query: bool = False            # 채팅에서 Multi Query 사용(LLM 호출 추가 → 지연/비용 증가)
+    multi_query_n: int = 3
+    reranker: str = "none"               # none | llm
 
     # Chunking
     chunk_max_chars: int = 1200

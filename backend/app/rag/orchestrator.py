@@ -53,7 +53,8 @@ class ChatTurn:
 
 class RAGOrchestrator:
     def __init__(self, *, db: BaseDatabase, retriever: Retriever, llm: LLMProvider, score_threshold: float,
-                 max_context_chunks: int = 5, history_turns: int = 6, embedding_name: str = "", llm_name: str = ""):
+                 max_context_chunks: int = 5, history_turns: int = 6, embedding_name: str = "", llm_name: str = "",
+                 reranker=None, multi_query: bool = False, multi_query_n: int = 3):
         self.db = db
         self.retriever = retriever
         self.llm = llm
@@ -62,6 +63,9 @@ class RAGOrchestrator:
         self.history_turns = history_turns
         self.embedding_name = embedding_name
         self.llm_name = llm_name
+        self.reranker = reranker
+        self.multi_query = multi_query
+        self.multi_query_n = multi_query_n
 
     # ── public ────────────────────────────────────────────────────
     def chat(self, message: str, conversation_id: str | None = None) -> ChatTurn:
@@ -82,10 +86,10 @@ class RAGOrchestrator:
         message_id = new_id()
         yield {"type": "meta", "conversation_id": cid, "message_id": message_id}
 
-        # 1) 검색 (대화 맥락을 반영한 검색 쿼리)
+        # 1) 검색 (대화 맥락 반영 Rewrite → 필요 시 Multi Query 확장 → Hybrid 검색)
         search_query = self.build_search_query(message, history)
         rewritten = search_query if search_query != message else None
-        retrieval = self.retriever.retrieve(search_query)
+        retrieval = self.search(search_query)
         retrieved_log = [c.as_source() for c in retrieval.chunks]
 
         # 2) Fail-Closed: 근거 부족 → LLM 호출 없이 표준 안내
@@ -148,6 +152,23 @@ class RAGOrchestrator:
         if short or anaphoric:
             return f"{prev_user} {message}"
         return message
+
+    def search(self, query: str, *, use_multi_query: bool | None = None, top_k: int | None = None):
+        """검색 파이프라인: (Multi Query) → Hybrid 검색 → (Reranker). 검색 테스트 화면도 이 경로를 쓴다."""
+        from app.rag.multiquery import generate_multi_queries
+
+        mq = self.multi_query if use_multi_query is None else use_multi_query
+        queries = [query]
+        if mq:
+            queries += generate_multi_queries(self.llm, query, n=self.multi_query_n)
+        retrieval = (self.retriever.retrieve_multi(queries, top_k=top_k) if len(queries) > 1
+                     else self.retriever.retrieve(query, top_k=top_k))
+        if self.reranker is not None and self.reranker.name != "none" and retrieval.chunks:
+            t0 = time.perf_counter()
+            retrieval.chunks = self.reranker.rerank(query, retrieval.chunks)
+            retrieval.elapsed_ms += int((time.perf_counter() - t0) * 1000)
+            retrieval.mode += "+rerank"
+        return retrieval
 
     def _build_messages(self, message: str, history: list[dict[str, Any]], chunks: list[RetrievedChunk]) -> list[ChatMessage]:
         msgs: list[ChatMessage] = []

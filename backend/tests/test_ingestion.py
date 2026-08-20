@@ -62,3 +62,17 @@ def test_chunk_splits_long_section_with_overlap():
     assert len(chunks) > 3
     assert all(len(c.content) <= 480 for c in chunks)
     assert all(c.section == "긴 문서 > 섹션" for c in chunks)
+
+
+def test_bm25_tokenizer_and_index():
+    from app.rag.bm25 import BM25Index, rrf_fuse, tokenize
+
+    toks = tokenize("배송비는 얼마인가요?")
+    assert "배송비는" in toks and "배송" in toks and "송비" in toks  # 한글 bigram
+    idx = BM25Index()
+    idx.build(["배송비는 편도 3,000원입니다", "환불은 7일 이내 신청", "주문 취소는 결제 후 1시간"])
+    assert idx.search("배송비 얼마")[0][0] == 0
+    assert idx.search("환불 기간")[0][0] == 1
+    assert idx.search("존재하지않는말")== []
+    fused = rrf_fuse([[0, 1, 2], [2, 0, 1]], k=60, weights=[0.7, 0.3])
+    assert fused[0][0] == 0  # dense 가중치 우세
