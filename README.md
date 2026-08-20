@@ -119,9 +119,13 @@ HTML 목업 보기: `docs/design/html/index.html`을 브라우저로 열거나, 
 | GET | `/api/admin/me` | 관리자 토큰 검증 (`ADMIN_TOKEN` 설정 시 관리자 API는 `Authorization: Bearer`) |
 | GET | `/api/health` | 프로바이더/임계값/색인 청크 수/`admin_auth` |
 
-## 다음 단계 (Phase 2~)
+## 검색 품질 (Phase 2 구현됨)
 
-미구현 화면 목록과 제안 순서: [docs/screens-todo.md](docs/screens-todo.md)
+- **Hybrid Search**: dense(임베딩) top-30 + BM25(한글 bigram 토크나이저, 순수 Python) top-30 → 가중 RRF(dense 0.7)로 후보 선택, 정렬은 코사인 점수(Fail-Closed 임계값과 일관). `RETRIEVAL_MODE=dense`로 끌 수 있음.
+- **Multi Query**: LLM이 확장 쿼리 생성 → RRF union. 채팅은 `MULTI_QUERY=true`, 검색 테스트 화면은 설정 토글.
+- **Reranker**: 인터페이스 + `RERANKER=llm`(LLM listwise) 옵션. 기본 none(무료 티어 메모리 제약으로 cross-encoder 미탑재).
+- **Retrieval 평가**: `eval/golden.jsonl`(14문항) + `scripts/eval_retrieval.py` — Recall@1/3/5·MRR@5, KPI Recall@5 ≥ 90% 게이트(현재 100%). 오프라인 회귀 테스트 포함.
 
+## 다음 단계 (Phase 3~4 잔여)
 
-BM25 + Hybrid Search, LLM 기반 Query Rewrite/Multi Query, Reranker, 골든 데이터셋 기반 Retrieval 평가(Recall@5), 관리자 검색 테스트 화면, 대시보드/미답변 분석, 권한 관리, PII 마스킹.
+화면 현황: [docs/screens-todo.md](docs/screens-todo.md) (목업 10개 전부 구현). 남은 것: RBAC(역할·문서별 권한), 문서 버전 관리, PII 마스킹, 플로팅 위젯, Agent-assist.
