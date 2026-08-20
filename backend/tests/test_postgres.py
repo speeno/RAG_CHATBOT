@@ -30,6 +30,7 @@ def pg_client(monkeypatch):
     monkeypatch.setenv("EMBEDDING_PROVIDER", "hash")
     monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
     monkeypatch.delenv("VOYAGE_API_KEY", raising=False)
+    monkeypatch.setenv("KMA_SERVICE_KEY", "")
     from app.core.config import get_settings
     get_settings.cache_clear()
     from fastapi.testclient import TestClient

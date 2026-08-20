@@ -50,7 +50,8 @@ def health(svc: Services = Depends(get_services)) -> dict[str, Any]:
 # ── chat ────────────────────────────────────────────────────────
 @router.post("/chat", response_model=S.ChatResponse)
 def chat(req: S.ChatRequest, svc: Services = Depends(get_services)) -> dict[str, Any]:
-    turn = svc.orchestrator.chat(req.message, req.conversation_id)
+    loc = (req.location.lat, req.location.lon) if req.location else None
+    turn = svc.orchestrator.chat(req.message, req.conversation_id, location=loc)
     return _turn_to_response(turn)
 
 
@@ -58,8 +59,10 @@ def chat(req: S.ChatRequest, svc: Services = Depends(get_services)) -> dict[str,
 def chat_stream(req: S.ChatRequest, svc: Services = Depends(get_services)) -> StreamingResponse:
     """SSE 스트림. 이벤트: meta → sources → delta* → done."""
 
+    loc = (req.location.lat, req.location.lon) if req.location else None
+
     def gen() -> Iterator[str]:
-        for ev in svc.orchestrator.chat_stream(req.message, req.conversation_id):
+        for ev in svc.orchestrator.chat_stream(req.message, req.conversation_id, location=loc):
             if ev["type"] == "done":
                 payload = _turn_to_response(ev["turn"])
                 yield _sse("done", payload)

@@ -18,9 +18,15 @@ class Source(BaseModel):
     score: float
 
 
+class GeoPoint(BaseModel):
+    lat: float = Field(ge=-90, le=90)
+    lon: float = Field(ge=-180, le=180)
+
+
 class ChatRequest(BaseModel):
     conversation_id: str | None = None
     message: str = Field(min_length=1, max_length=2000)
+    location: GeoPoint | None = None   # 브라우저 위치정보(위경도) — 날씨 질문에 지역명이 없을 때 사용
 
 
 class ChatResponse(BaseModel):

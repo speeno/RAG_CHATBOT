@@ -14,6 +14,7 @@ def client(tmp_path, monkeypatch):
     monkeypatch.setenv("EMBEDDING_PROVIDER", "hash")
     monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
     monkeypatch.delenv("VOYAGE_API_KEY", raising=False)
+    monkeypatch.setenv("KMA_SERVICE_KEY", "")   # .env 의 실제 키가 테스트로 새지 않도록
     from app.core.config import get_settings
     get_settings.cache_clear()
     from fastapi.testclient import TestClient

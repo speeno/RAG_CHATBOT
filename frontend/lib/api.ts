@@ -342,16 +342,19 @@ export type StreamHandlers = {
   onError?: (err: Error) => void;
 };
 
+export type GeoPoint = { lat: number; lon: number };
+
 export async function chatStream(
   message: string,
   conversation_id: string | null,
   h: StreamHandlers,
   signal?: AbortSignal,
+  location?: GeoPoint | null,
 ): Promise<void> {
   const res = await f(`${API_URL}/api/chat/stream`, {
     method: "POST",
     headers: { "Content-Type": "application/json", Accept: "text/event-stream" },
-    body: JSON.stringify({ message, conversation_id }),
+    body: JSON.stringify({ message, conversation_id, location: location ?? null }),
     signal,
   });
   if (!res.ok || !res.body) {

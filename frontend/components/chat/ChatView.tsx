@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { API_URL, api, chatStream, type ChatResponse, type Source } from "@/lib/api";
+import { API_URL, api, chatStream, type ChatResponse, type GeoPoint, type Source } from "@/lib/api";
 import { Icon } from "@/components/Icon";
 import { BotMessage, UserMessage, type BotMsg } from "./Messages";
 
@@ -17,6 +17,50 @@ const SIDE_QUESTIONS = ["배송 조회는 어떻게 하나요?", "환불 처리 
 type Msg = { kind: "user"; id: string; text: string; time: string } | ({ kind: "bot" } & BotMsg);
 
 const nowTime = () => new Date().toLocaleTimeString("ko-KR", { hour: "numeric", minute: "2-digit" });
+
+/* ── 날씨 질문 시 브라우저 위치정보 (지역명이 없을 때 현재 위치 날씨 제공) ── */
+const GEO_KEY = "rag.geo";                       // {lat, lon, at} 또는 "denied"
+const WEATHER_RE = /날씨|기온|온도|비\s|비가|비\s?와|비\s?오|눈\s|눈이|눈\s?와|눈\s?오|폭우|폭설|호우|태풍|특보|우산|강수|더위|추위|더워|추워|덥|춥|바람|습도|맑|흐리|우천|기상/;
+
+function getStoredGeo(): GeoPoint | null | "denied" {
+  try {
+    const raw = localStorage.getItem(GEO_KEY);
+    if (!raw) return null;
+    if (raw === "denied") return "denied";
+    const v = JSON.parse(raw) as { lat: number; lon: number };
+    return typeof v.lat === "number" && typeof v.lon === "number" ? { lat: v.lat, lon: v.lon } : null;
+  } catch {
+    return null;
+  }
+}
+
+/** 위치정보 1회 획득 후 localStorage 저장. 거부/실패 시 "denied" 기록(재요청으로 사용자를 귀찮게 하지 않음). */
+function requestGeo(): Promise<GeoPoint | null> {
+  return new Promise((resolve) => {
+    if (typeof navigator === "undefined" || !navigator.geolocation) return resolve(null);
+    const done = (v: GeoPoint | null) => resolve(v);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const v = { lat: Math.round(pos.coords.latitude * 10000) / 10000, lon: Math.round(pos.coords.longitude * 10000) / 10000 };
+        try { localStorage.setItem(GEO_KEY, JSON.stringify({ ...v, at: Date.now() })); } catch { /* ignore */ }
+        done(v);
+      },
+      () => {
+        try { localStorage.setItem(GEO_KEY, "denied"); } catch { /* ignore */ }
+        done(null);
+      },
+      { timeout: 5000, maximumAge: 600000 },
+    );
+  });
+}
+
+async function geoForMessage(text: string): Promise<GeoPoint | null> {
+  if (!WEATHER_RE.test(text)) return null;
+  const stored = getStoredGeo();
+  if (stored === "denied") return null;
+  if (stored) return stored;
+  return requestGeo();
+}
 
 /** 상담 이력(/history)용: 이 브라우저에서 진행한 대화 목록을 localStorage 에 보관 */
 export const CONVERSATIONS_KEY = "rag.conversations";
@@ -114,6 +158,7 @@ export function ChatView() {
         { kind: "bot", id: botId, messageId: null, userQuestion: q, text: "", sources: [], candidateSources: [], streaming: true, done: null, time: nowTime() },
       ]);
       setBusy(true);
+      const location = await geoForMessage(q);  // 날씨 질문일 때만 위치정보 사용(1회 획득 후 저장)
       const ac = new AbortController();
       abortRef.current = ac;
       await chatStream(
@@ -134,6 +179,7 @@ export function ChatView() {
           },
         },
         ac.signal,
+        location,
       );
       updateBot(botId, (m) => ({ streaming: false, text: m.text }));
       setBusy(false);

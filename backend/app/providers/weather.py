@@ -42,16 +42,47 @@ PTY = {0: None, 1: "비", 2: "비/눈", 3: "눈", 4: "소나기", 5: "빗방울"
 SKY = {1: "맑음", 3: "구름많음", 4: "흐림"}
 
 
+def latlon_to_grid(lat: float, lon: float) -> tuple[int, int]:
+    """위경도 → 기상청 단기예보 격자(nx, ny). 기상청 공식 Lambert Conformal Conic 변환."""
+    import math
+
+    RE, GRID = 6371.00877, 5.0
+    SLAT1, SLAT2, OLON, OLAT = 30.0, 60.0, 126.0, 38.0
+    XO, YO = 43, 136
+    DEGRAD = math.pi / 180.0
+    re = RE / GRID
+    slat1, slat2 = SLAT1 * DEGRAD, SLAT2 * DEGRAD
+    olon, olat = OLON * DEGRAD, OLAT * DEGRAD
+    sn = math.tan(math.pi * 0.25 + slat2 * 0.5) / math.tan(math.pi * 0.25 + slat1 * 0.5)
+    sn = math.log(math.cos(slat1) / math.cos(slat2)) / math.log(sn)
+    sf = math.tan(math.pi * 0.25 + slat1 * 0.5)
+    sf = sf ** sn * math.cos(slat1) / sn
+    ro = math.tan(math.pi * 0.25 + olat * 0.5)
+    ro = re * sf / (ro ** sn)
+    ra = math.tan(math.pi * 0.25 + lat * DEGRAD * 0.5)
+    ra = re * sf / (ra ** sn)
+    theta = lon * DEGRAD - olon
+    if theta > math.pi:
+        theta -= 2.0 * math.pi
+    if theta < -math.pi:
+        theta += 2.0 * math.pi
+    theta *= sn
+    x = int(ra * math.sin(theta) + XO + 0.5)
+    y = int(ro - ra * math.cos(theta) + YO + 0.5)
+    return x, y
+
+
 def is_weather_query(text: str) -> bool:
     t = f"{text} "
     return any(w in t for w in _WEATHER_WORDS)
 
 
-def detect_region(text: str) -> str:
+def detect_region(text: str) -> str | None:
+    """텍스트에서 지역명을 찾는다. 없으면 None(호출부가 위치정보/기본값으로 폴백)."""
     for name in REGIONS:
         if name in text:
             return name
-    return DEFAULT_REGION
+    return None
 
 
 @dataclass
@@ -150,9 +181,15 @@ class KmaWeather:
         return items
 
     # ── public ───────────────────────────────────────────────────
-    def get_report(self, region: str | None = None, *, now: datetime | None = None) -> WeatherReport | None:
-        region = region if region in REGIONS else DEFAULT_REGION
-        nx, ny = REGIONS[region]
+    def get_report(self, region: str | None = None, *, grid: tuple[int, int] | None = None,
+                   label: str | None = None, now: datetime | None = None) -> WeatherReport | None:
+        """region(지역명) 또는 grid(nx, ny — 브라우저 위치정보에서 변환) 기준 리포트. 둘 다 없으면 서울."""
+        if grid is not None:
+            nx, ny = grid
+            region = label or "현재 위치"
+        else:
+            region = region if region in REGIONS else DEFAULT_REGION
+            nx, ny = REGIONS[region]
         now = now or datetime.now(KST)
 
         bd, bt = self._ncst_base(now)

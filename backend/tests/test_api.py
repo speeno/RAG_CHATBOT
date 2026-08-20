@@ -402,10 +402,41 @@ def test_weather_unit_helpers():
 
     assert is_weather_query("내일 비 와요?") and is_weather_query("태풍 때문에 배송 되나요")
     assert not is_weather_query("환불은 어떻게 신청하나요?")
-    assert detect_region("부산은 눈 오나요") == "부산" and detect_region("비 오나요") == "서울"
+    assert detect_region("부산은 눈 오나요") == "부산" and detect_region("비 오나요") is None  # None → 위치정보/기본값 폴백
     w = KmaWeather("dummy%2Fkey%3D%3D")
     assert w.service_key == "dummy/key=="   # 인코딩 키 자동 디코딩
     assert KmaWeather._ncst_base(datetime(2026, 8, 20, 14, 50, tzinfo=KST)) == ("20260820", "1400")
     assert KmaWeather._ncst_base(datetime(2026, 8, 20, 14, 10, tzinfo=KST)) == ("20260820", "1300")
     assert KmaWeather._fcst_base(datetime(2026, 8, 20, 14, 30, tzinfo=KST)) == ("20260820", "1400")
     assert KmaWeather._fcst_base(datetime(2026, 8, 20, 2, 5, tzinfo=KST)) == ("20260819", "2300")
+
+
+def test_weather_uses_browser_location_when_no_region(seeded):
+    calls = []
+
+    class _LocWeather(_FakeWeather):
+        def get_report(self, region=None, *, grid=None, label=None, **kw):
+            calls.append({"region": region, "grid": grid, "label": label})
+            r = super().get_report()
+            if grid is not None:
+                r.region = label or "현재 위치"
+            return r
+
+    svc = seeded.app.state.services
+    svc.orchestrator.weather = _LocWeather()
+    try:
+        # 지역명 없음 + 위치정보 있음 → 격자 변환 사용
+        r = seeded.post("/api/chat", json={"message": "현재 날씨에 비 오나요?", "location": {"lat": 35.1796, "lon": 129.0756}}).json()
+        assert r["answerable"] is True
+        assert calls[-1]["grid"] is not None and calls[-1]["label"] == "현재 위치"
+        from app.providers.weather import REGIONS, latlon_to_grid
+        assert latlon_to_grid(35.1796, 129.0756) == REGIONS["부산"]      # 부산시청 좌표 → 부산 격자
+        assert latlon_to_grid(37.5665, 126.9780) == REGIONS["서울"]      # 서울시청 좌표 → 서울 격자
+        # 지역명이 있으면 위치정보보다 우선
+        seeded.post("/api/chat", json={"message": "제주 날씨 알려줘", "location": {"lat": 37.5665, "lon": 126.978}})
+        assert calls[-1]["region"] == "제주" and calls[-1]["grid"] is None
+        # 위치정보 없으면 기본(서울)
+        seeded.post("/api/chat", json={"message": "지금 비 오나요?"})
+        assert calls[-1]["region"] is None and calls[-1]["grid"] is None  # region None → provider 기본(서울)
+    finally:
+        svc.orchestrator.weather = None

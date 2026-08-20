@@ -71,15 +71,17 @@ class RAGOrchestrator:
         self.weather = weather   # KmaWeather | None — 실시간 날씨 컨텍스트(PRD Phase 4 도구 사용의 경량 구현)
 
     # ── public ────────────────────────────────────────────────────
-    def chat(self, message: str, conversation_id: str | None = None) -> ChatTurn:
+    def chat(self, message: str, conversation_id: str | None = None,
+             location: tuple[float, float] | None = None) -> ChatTurn:
         result: ChatTurn | None = None
-        for ev in self.chat_stream(message, conversation_id):
+        for ev in self.chat_stream(message, conversation_id, location=location):
             if ev["type"] == "done":
                 result = ev["turn"]
         assert result is not None
         return result
 
-    def chat_stream(self, message: str, conversation_id: str | None = None) -> Iterator[dict[str, Any]]:
+    def chat_stream(self, message: str, conversation_id: str | None = None,
+                    location: tuple[float, float] | None = None) -> Iterator[dict[str, Any]]:
         """이벤트 스트림: meta → sources → delta* → done."""
         t_start = time.perf_counter()
         message = message.strip()
@@ -96,7 +98,7 @@ class RAGOrchestrator:
         retrieved_log = [c.as_source() for c in retrieval.chunks]
 
         # 1.5) 날씨 질문이면 실시간 기상 컨텍스트 확보 (KMA_SERVICE_KEY 설정 시)
-        weather_chunk = self._weather_chunk(message)
+        weather_chunk = self._weather_chunk(message, location)
 
         # 2) Fail-Closed: 근거 부족 → LLM 호출 없이 표준 안내
         #    단, 실시간 날씨 근거가 있으면 날씨 컨텍스트만으로 답변한다(문서와 동일하게 '주어진 컨텍스트'에 근거).
@@ -152,16 +154,21 @@ class RAGOrchestrator:
         yield {"type": "done", "turn": turn}
 
     # ── internals ─────────────────────────────────────────────────
-    def _weather_chunk(self, message: str) -> RetrievedChunk | None:
-        """날씨 관련 질문이면 실시간 기상 정보를 컨텍스트 청크로 만들어 반환. 실패/비활성 시 None."""
+    def _weather_chunk(self, message: str, location: tuple[float, float] | None = None) -> RetrievedChunk | None:
+        """날씨 관련 질문이면 실시간 기상 정보를 컨텍스트 청크로 만들어 반환. 실패/비활성 시 None.
+        지역 우선순위: 질문 속 지역명 > 브라우저 위치정보(location) > 기본(서울)."""
         if self.weather is None:
             return None
-        from app.providers.weather import detect_region, is_weather_query
+        from app.providers.weather import detect_region, is_weather_query, latlon_to_grid
 
         if not is_weather_query(message):
             return None
         try:
-            report = self.weather.get_report(detect_region(message))
+            region = detect_region(message)
+            if region is None and location is not None:
+                report = self.weather.get_report(grid=latlon_to_grid(*location), label="현재 위치")
+            else:
+                report = self.weather.get_report(region)
         except Exception:  # noqa: BLE001 — 날씨 실패가 상담을 막지 않도록
             logger.exception("날씨 조회 실패")
             return None
