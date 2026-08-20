@@ -210,6 +210,7 @@ class HealthOut(BaseModel):
     db_backend: str = "sqlite"
     db_ok: bool = True
     admin_auth: bool = False
+    weather: bool = False
     llm_provider: str
     embedding_provider: str
     retrieval_mode: str = "dense"

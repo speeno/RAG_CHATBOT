@@ -7,6 +7,7 @@ from __future__ import annotations
 import logging
 import re
 import time
+from datetime import datetime, timedelta, timezone
 from dataclasses import dataclass, field
 from typing import Any, Iterator
 
@@ -16,6 +17,7 @@ from app.providers.llm import ChatMessage, LLMProvider
 from app.rag.retriever import RetrievedChunk, Retriever
 
 logger = logging.getLogger(__name__)
+KST_TZ = timezone(timedelta(hours=9))
 
 SYSTEM_PROMPT = """당신은 회사의 공식 AI 상담 도우미입니다. 아래 원칙을 반드시 지키세요.
 
@@ -54,7 +56,7 @@ class ChatTurn:
 class RAGOrchestrator:
     def __init__(self, *, db: BaseDatabase, retriever: Retriever, llm: LLMProvider, score_threshold: float,
                  max_context_chunks: int = 5, history_turns: int = 6, embedding_name: str = "", llm_name: str = "",
-                 reranker=None, multi_query: bool = False, multi_query_n: int = 3):
+                 reranker=None, multi_query: bool = False, multi_query_n: int = 3, weather=None):
         self.db = db
         self.retriever = retriever
         self.llm = llm
@@ -66,6 +68,7 @@ class RAGOrchestrator:
         self.reranker = reranker
         self.multi_query = multi_query
         self.multi_query_n = multi_query_n
+        self.weather = weather   # KmaWeather | None — 실시간 날씨 컨텍스트(PRD Phase 4 도구 사용의 경량 구현)
 
     # ── public ────────────────────────────────────────────────────
     def chat(self, message: str, conversation_id: str | None = None) -> ChatTurn:
@@ -92,8 +95,12 @@ class RAGOrchestrator:
         retrieval = self.search(search_query, access_levels={"public"})  # 익명 사용자 채팅 → public 문서만(PRD §29)
         retrieved_log = [c.as_source() for c in retrieval.chunks]
 
+        # 1.5) 날씨 질문이면 실시간 기상 컨텍스트 확보 (KMA_SERVICE_KEY 설정 시)
+        weather_chunk = self._weather_chunk(message)
+
         # 2) Fail-Closed: 근거 부족 → LLM 호출 없이 표준 안내
-        if not retrieval.chunks or retrieval.top_score < self.score_threshold:
+        #    단, 실시간 날씨 근거가 있으면 날씨 컨텍스트만으로 답변한다(문서와 동일하게 '주어진 컨텍스트'에 근거).
+        if (not retrieval.chunks or retrieval.top_score < self.score_threshold) and weather_chunk is None:
             answer = NO_ANSWER_MESSAGE
             yield {"type": "sources", "sources": []}
             yield {"type": "delta", "text": answer}
@@ -105,8 +112,11 @@ class RAGOrchestrator:
             yield {"type": "done", "turn": turn}
             return
 
-        # 3) Context 구성 + LLM
-        context_chunks = retrieval.chunks[: self.max_context_chunks]
+        # 3) Context 구성 + LLM (문서 컨텍스트 + 필요 시 실시간 날씨 블록)
+        grounded = bool(retrieval.chunks) and retrieval.top_score >= self.score_threshold
+        context_chunks = retrieval.chunks[: self.max_context_chunks] if grounded else []
+        if weather_chunk is not None:
+            context_chunks = [*context_chunks, weather_chunk]
         candidate_sources = [c.as_source() for c in context_chunks]
         yield {"type": "sources", "sources": candidate_sources}
 
@@ -142,6 +152,35 @@ class RAGOrchestrator:
         yield {"type": "done", "turn": turn}
 
     # ── internals ─────────────────────────────────────────────────
+    def _weather_chunk(self, message: str) -> RetrievedChunk | None:
+        """날씨 관련 질문이면 실시간 기상 정보를 컨텍스트 청크로 만들어 반환. 실패/비활성 시 None."""
+        if self.weather is None:
+            return None
+        from app.providers.weather import detect_region, is_weather_query
+
+        if not is_weather_query(message):
+            return None
+        try:
+            report = self.weather.get_report(detect_region(message))
+        except Exception:  # noqa: BLE001 — 날씨 실패가 상담을 막지 않도록
+            logger.exception("날씨 조회 실패")
+            return None
+        if report is None:
+            return None
+        now = datetime.now(KST_TZ).strftime("%Y-%m-%d")
+        return RetrievedChunk(
+            chunk_id=f"weather-{report.region}",
+            document_pk="weather-live",
+            document_id="KMA-LIVE",
+            title="실시간 기상 정보 (기상청 단기예보 서비스)",
+            section=f"{report.region} 현재·오늘·내일",
+            content=report.as_context_text(),
+            score=1.0,
+            version=None,
+            updated_at=now,
+            category="weather",
+        )
+
     def build_search_query(self, message: str, history: list[dict[str, Any]]) -> str:
         """간이 Query Rewrite(PRD §19): 짧은 후속 질문이면 직전 사용자 질문을 덧붙여 검색한다. (검색 테스트 화면에서도 사용)"""
         prev_user = next((m["content"] for m in reversed(history) if m["role"] == "user"), None)

@@ -118,6 +118,7 @@ HTML 목업 보기: `docs/design/html/index.html`을 브라우저로 열거나, 
 | GET | `/api/stats/overview`, `/api/stats/unanswered` | 대시보드 KPI/추이/카테고리/피드백/주요 질문, 미답변 TOP N·추천·처리 상태 (`/admin`, `/admin/unanswered`) |
 | PATCH | `/api/stats/unanswered/{key}` | 미답변 질문 처리 상태/메모 |
 | POST/GET/PATCH | `/api/inquiries` | 상담원 연결·문의 접수(공개) / 목록·처리(관리자) |
+| GET | `/api/admin/weather?region=` | 날씨 연동 확인(관리자) — `KMA_SERVICE_KEY` 필요 |
 | GET | `/api/admin/me`, `/api/admin/settings` | 관리자 토큰 검증 / 런타임 설정 스냅샷(읽기 전용) (`ADMIN_TOKEN` 설정 시 관리자 API는 `Authorization: Bearer`) |
 | GET | `/api/health` | 프로바이더/임계값/색인 청크 수/`admin_auth` |
 
@@ -130,4 +131,4 @@ HTML 목업 보기: `docs/design/html/index.html`을 브라우저로 열거나, 
 
 ## 다음 단계 (Phase 3~4 잔여)
 
-화면 현황: [docs/screens-todo.md](docs/screens-todo.md) (목업 10개 전부 구현). 문서별 접근 레벨(public/internal, 검색 단계 필터)·분류 관리·모니터링·`/embed`(사용자 전용 상담 경로)까지 구현됨. 남은 것: 역할 기반 RBAC, 문서 버전 관리, PII 마스킹, 플로팅 위젯, Agent-assist.
+화면 현황: [docs/screens-todo.md](docs/screens-todo.md) (목업 10개 전부 구현). 문서별 접근 레벨(public/internal, 검색 단계 필터)·분류 관리·모니터링·`/embed`(사용자 전용 상담 경로)·**실시간 날씨 컨텍스트**(data.go.kr 단기예보, `KMA_SERVICE_KEY` 설정 시 — 날씨 질문에 실황/예보를 근거로 답변, 출처 `KMA-LIVE`)까지 구현됨. 남은 것: 역할 기반 RBAC, 문서 버전 관리, PII 마스킹, 플로팅 위젯, Agent-assist.

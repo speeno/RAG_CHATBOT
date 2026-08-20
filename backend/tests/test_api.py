@@ -355,3 +355,57 @@ def test_monitoring_endpoint(seeded):
     job = m["jobs"][0]
     assert {"title", "processing_status", "elapsed_s", "chunk_count", "access_level"} <= set(job)
     assert m["uptime_s"] >= 0 and "system" in m and m["open_inquiries"] == 0
+
+
+class _FakeWeather:
+    def __init__(self):
+        from app.providers.weather import WeatherReport
+        self._r = WeatherReport(
+            region="서울", observed_at="2026-08-20 14:00 KST",
+            now={"temp": 27.0, "pty": "비", "rain_1h": 4.5, "humidity": 88.0, "wind": 3.2},
+            today={"sky": "흐림", "pop_max": 90, "pty_set": ["비"], "tmin": 24, "tmax": 29},
+            tomorrow={"sky": "맑음", "pop_max": 10, "pty_set": [], "tmin": 23, "tmax": 31},
+        )
+
+    def get_report(self, region=None, **kw):
+        return self._r
+
+
+def test_weather_context_answers_without_kb(seeded):
+    svc = seeded.app.state.services
+    svc.orchestrator.weather = _FakeWeather()
+    try:
+        # 지식베이스에 없는 날씨 질문 → 날씨 컨텍스트만으로 답변 (Fail-Closed 우회)
+        r = seeded.post("/api/chat", json={"message": "오늘 서울 날씨에 비 와요?"}).json()
+        assert r["answerable"] is True, r["answer"]
+        assert any(s["document_id"] == "KMA-LIVE" for s in r["sources"])
+        # 날씨와 무관한 미지 질문은 여전히 Fail-Closed
+        r2 = seeded.post("/api/chat", json={"message": "양자역학 슈뢰딩거 방정식 유도"}).json()
+        assert r2["answerable"] is False
+        # 문서 근거가 있는 질문 + 날씨 단어 → 문서와 날씨 컨텍스트가 함께 후보로 감
+        r3 = seeded.post("/api/chat", json={"message": "비 오는 날씨엔 배송이 늦어지나요? 배송 기간 알려줘"}).json()
+        assert r3["answerable"] is True
+    finally:
+        svc.orchestrator.weather = None
+
+
+def test_weather_disabled_keeps_fail_closed(seeded):
+    assert seeded.app.state.services.weather is None
+    r = seeded.post("/api/chat", json={"message": "오늘 서울 날씨 어때?"}).json()
+    assert r["answerable"] is False
+    assert seeded.get("/api/admin/weather").status_code == 503
+
+
+def test_weather_unit_helpers():
+    from datetime import datetime
+    from app.providers.weather import KST, KmaWeather, detect_region, is_weather_query
+
+    assert is_weather_query("내일 비 와요?") and is_weather_query("태풍 때문에 배송 되나요")
+    assert not is_weather_query("환불은 어떻게 신청하나요?")
+    assert detect_region("부산은 눈 오나요") == "부산" and detect_region("비 오나요") == "서울"
+    w = KmaWeather("dummy%2Fkey%3D%3D")
+    assert w.service_key == "dummy/key=="   # 인코딩 키 자동 디코딩
+    assert KmaWeather._ncst_base(datetime(2026, 8, 20, 14, 50, tzinfo=KST)) == ("20260820", "1400")
+    assert KmaWeather._ncst_base(datetime(2026, 8, 20, 14, 10, tzinfo=KST)) == ("20260820", "1300")
+    assert KmaWeather._fcst_base(datetime(2026, 8, 20, 14, 30, tzinfo=KST)) == ("20260820", "1400")
+    assert KmaWeather._fcst_base(datetime(2026, 8, 20, 2, 5, tzinfo=KST)) == ("20260819", "2300")

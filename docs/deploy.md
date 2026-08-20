@@ -83,6 +83,7 @@ TEST_DATABASE_URL=postgresql://localhost/rag_chatbot_test .venv/bin/python -m py
    | `CORS_ORIGINS` | 일단 비워두고 4단계 후 `https://<project>.vercel.app` |
    | `CORS_ORIGIN_REGEX` | `https://.*\.vercel\.app` (Preview 배포 허용; 필요 없으면 비움) |
    | `ADMIN_TOKEN` | 관리자 화면/API 보호 토큰(긴 랜덤 문자열). 비우면 관리자 화면이 공개됨 |
+   | `KMA_SERVICE_KEY` | (선택) data.go.kr 단기예보 인증키 — 실시간 날씨 컨텍스트 활성 |
 3. Deploy → 로그에 `services ready: {... 'db_backend': 'postgres', 'db_ok': True ...}` 확인 → `https://<svc>.onrender.com/api/health` 응답 확인.
 4. 시드: 무료 티어는 Shell이 제한적이므로 로컬에서 `DATABASE_URL=<supabase> python scripts/seed.py`로 넣거나, 배포된 프론트 `/admin/knowledge`에서 업로드한다.
 

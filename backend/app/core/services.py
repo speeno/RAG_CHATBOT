@@ -11,6 +11,7 @@ from app.ingestion.indexer import Indexer
 from app.providers.embeddings import EmbeddingProvider, build_embedding_provider
 from app.providers.llm import LLMProvider, build_llm_provider
 from app.rag.orchestrator import RAGOrchestrator
+from app.providers.weather import KmaWeather
 from app.rag.reranker import Reranker, build_reranker
 from app.rag.retriever import NumpyVectorStore, Retriever
 
@@ -28,6 +29,7 @@ class Services:
     llm: LLMProvider
     indexer: Indexer
     orchestrator: RAGOrchestrator
+    weather: KmaWeather | None = None
     started_at: float = field(default_factory=time.time)
 
     def health(self) -> dict:
@@ -42,6 +44,7 @@ class Services:
             "db_backend": self.db.name,
             "db_ok": db_ok,
             "admin_auth": bool(self.settings.admin_token),
+            "weather": self.weather is not None,
             "llm_provider": self.llm.name,
             "embedding_provider": self.embedder.name,
             "retrieval_mode": self.retriever.mode,
@@ -76,6 +79,7 @@ def build_services(settings: Settings, *, db_path: str | None = None) -> Service
         openai_api_key=settings.resolved_openai_key,
         openai_model=settings.openai_model,
     )
+    weather = KmaWeather(settings.kma_service_key) if settings.kma_service_key else None
     reranker = build_reranker(settings.reranker, llm)
     indexer = Indexer(db, embedder, store, chunk_max_chars=settings.chunk_max_chars,
                       chunk_overlap_chars=settings.chunk_overlap_chars)
@@ -83,9 +87,10 @@ def build_services(settings: Settings, *, db_path: str | None = None) -> Service
         db=db, retriever=retriever, llm=llm, score_threshold=settings.score_threshold,
         max_context_chunks=settings.max_context_chunks, embedding_name=embedder.name, llm_name=llm.name,
         reranker=reranker, multi_query=settings.multi_query, multi_query_n=settings.multi_query_n,
+        weather=weather,
     )
     if settings.resolved_llm_provider == "extractive":
         logger.warning("LLM API 키 미설정 → 오프라인 모드(extractive LLM). 실제 답변 생성은 ANTHROPIC/OPENAI 키 설정 후 가능합니다.")
     if settings.resolved_embedding_provider == "hash":
         logger.warning("임베딩 API 키 미설정 → hash n-gram 임베딩(어휘 기반) 사용. 의미 검색 품질은 제한적입니다.")
-    return Services(settings, db, embedder, store, retriever, reranker, llm, indexer, orchestrator)
+    return Services(settings, db, embedder, store, retriever, reranker, llm, indexer, orchestrator, weather=weather)

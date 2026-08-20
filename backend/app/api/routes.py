@@ -437,6 +437,18 @@ def monitoring(svc: Services = Depends(get_services)) -> dict[str, Any]:
             "open_inquiries": len(svc.db.list_inquiries(limit=500, status="open"))}
 
 
+@admin.get("/admin/weather")
+def weather_test(region: str = "서울", svc: Services = Depends(get_services)) -> dict[str, Any]:
+    """날씨 연동 확인용(관리자). KMA_SERVICE_KEY 미설정이면 503."""
+    if svc.weather is None:
+        raise HTTPException(503, "KMA_SERVICE_KEY 미설정 — 날씨 기능 비활성")
+    report = svc.weather.get_report(region)
+    if report is None:
+        raise HTTPException(502, "기상청 API 응답 실패(키 승인 여부/네트워크 확인)")
+    return {"region": report.region, "observed_at": report.observed_at, "now": report.now,
+            "today": report.today, "tomorrow": report.tomorrow, "context_text": report.as_context_text()}
+
+
 # ── search test (관리자용 검색 디버그, PRD §32) ───────────────────
 @admin.post("/search/test", response_model=S.SearchTestResponse)
 def search_test(req: S.SearchTestRequest, svc: Services = Depends(get_services)) -> dict[str, Any]:
